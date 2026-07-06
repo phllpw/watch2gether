@@ -1,0 +1,23 @@
+{
+  "rules": {
+    /* 
+      ATENÇÃO: Estas regras de segurança são projetadas apenas para o MVP.
+      NÃO use esta configuração aberta em ambiente de produção!
+      Qualquer pessoa com acesso à URL do banco de dados poderá ler e escrever nos caminhos.
+    */
+    "rooms": {
+      "$roomId": {
+        // Permite que qualquer pessoa leia e modifique informações da sala (vídeo e status de reprodução)
+        ".read": "true",
+        ".write": "true",
+
+        // Validação de dados do chat para evitar mensagens vazias ou gigantes
+        "chat": {
+          "$messageId": {
+            ".validate": "newData.hasChildren(['sender', 'text', 'timestamp']) && newData.child('text').val().length > 0 && newData.child('text').val().length < 500 && newData.child('sender').val().length > 0"
+          }
+        }
+      }
+    }
+  }
+}
