@@ -154,17 +154,50 @@ Para contornar as restrições de CORS e carregar os vídeos do Drive nativament
    npm run build
    cd ..
    ```
-3. Inicie o emulador de Cloud Functions a partir da raiz do projeto:
-   ```bash
-   firebase emulators:start --only functions
-   ```
-   *Nota:* O emulador subirá o endpoint HTTP local no endereço configurado em `VITE_DRIVE_STREAM_BASE_URL`.
+
+3. **Terminais Necessários para Desenvolvimento:**
+   Para rodar o projeto localmente com suporte ao streaming proxy, você deve abrir **dois terminais distintos**:
+   
+   - **Terminal 1: Frontend App**
+     ```bash
+     npm run dev
+     ```
+   - **Terminal 2: Firebase Cloud Functions Emulator**
+     ```bash
+     firebase emulators:start --only functions --project watch2gether-9b6dd
+     ```
+     *Nota:* O emulador de funções ficará rodando de forma **contínua** no terminal, interceptando e tratando as requisições de proxy do player, até que você o finalize pressionando `Ctrl + C`.
 
 4. Em produção, você deve apontar a variável `VITE_DRIVE_STREAM_BASE_URL` para a URL real da Cloud Function gerada após o deploy (`firebase deploy --only functions`).
 
-### 🔒 Considerações de Segurança sobre o Token de Acesso
-No MVP local, a tag `<video>` do navegador precisa fazer requisições GET diretas e não permite customizar cabeçalhos HTTP (como `Authorization`). Por isso, passamos o `accessToken` temporário do usuário logado via query string na URL do vídeo.
-*   **Temporário para MVP:** Esta solução via query parameter é temporária para viabilizar o fluxo no frontend sem servidor próprio de sessão.
-*   **Evolução para Produção:** Em uma versão de produção, recomenda-se ocultar o token do cliente final e usar cookies seguros `HttpOnly` compartilhados com o domínio do proxy, ou criar sessões temporárias assinadas no backend (`streamSessionId` de curta duração na memória do servidor para o token real do Google).
+---
+
+## ✅ Estado Validado do MVP
+
+O Watch2Gether foi homologado com sucesso nos seguintes fluxos de funcionamento:
+- **Firebase Realtime Database:** Armazenamento e sincronização em tempo real configurados (modo real e mock de demonstração).
+- **Chat:** Envio, recebimento e rolagem automática de mensagens síncronas em tempo real.
+- **Teste de Mídia Local:** O vídeo `/test-video.mp4` carrega nativamente no HTML5 `<video>` e sincroniza ações de play/pause/seek com baixíssimo delay.
+- **Google Cloud OAuth & Picker:** Fluxo de login e seletor do Google Drive funcionando para carregar arquivos de vídeo.
+- **driveStream Cloud Function Proxy:** O emulador intercepta as requisições, repassa os cabeçalhos de `Range` e responde com chunks parciais de mídia (`206 Partial Content`), superando os bloqueios de CORS do navegador.
+- **Sync de Playback do Drive:** Vídeos do Google Drive selecionados tocam nativamente no HTML5 `<video>` com sincronia integral de play, pause, seeks e heartbeats periódicos de posicionamento.
+- **Controles Nativos e Responsivos:** O player de vídeo renderiza e expõe corretamente os controles nativos (barra de timeline, play/pause, volume, tela cheia) em layouts mobile e desktop de forma fluida.
+
+---
+
+## 🔒 Considerações de Segurança e Problemas Conhecidos
+
+### 1. Limitações de Acesso ao Arquivo (Erro 403)
+Se um convidado abrir a sala e se deparar com um erro no player, verifique se a conta do Google dele possui permissão de leitura no arquivo selecionado.
+- *Mensagem do App:* `"Sua conta Google não tem acesso a este arquivo. Peça ao host para compartilhar o vídeo com você ou tornar o arquivo acessível por link."`
+
+### 2. Expiração de Tokens do Google Drive
+Os tokens de acesso OAuth fornecidos pela API do Google expiram automaticamente após 1 hora. Se a reprodução do vídeo parar repentinamente ou o Picker falhar ao ser aberto, o usuário deverá clicar no botão de conexão novamente para restabelecer a sessão e renovar o token.
+
+### 3. Tráfego de Token via Query Parameter
+No MVP, a tag nativa `<video>` do navegador realiza solicitações GET diretas e não permite anexar cabeçalhos HTTP adicionais (como `Authorization: Bearer`). Por isso, repassamos o token de acesso temporário na query string do player (`accessToken=...`).
+- **Segurança no MVP:** Essa abordagem é temporária para viabilizar o fluxo no frontend sem servidor próprio de sessão. O token fica apenas em memória de renderização (`sessionStorage`), não sendo salvo em nenhuma parte do banco de dados e nunca sendo impresso nos logs do console.
+- **Uso em Produção:** Em ambientes comerciais reais de produção, deve-se evoluir para o uso de Cookies seguros `HttpOnly` associados ao domínio do proxy ou criar sessões temporárias assinadas no backend (`streamSessionId` de curta duração na memória do servidor para o token real do Google).
+
 
 
