@@ -198,8 +198,3 @@ Os tokens de acesso OAuth fornecidos pela API do Google expiram automaticamente 
 No MVP, a tag nativa `<video>` do navegador realiza solicitações GET diretas e não permite anexar cabeçalhos HTTP adicionais (como `Authorization: Bearer`). Por isso, repassamos o token de acesso temporário na query string do player (`accessToken=...`).
 - **Segurança no MVP:** Essa abordagem é temporária para viabilizar o fluxo no frontend sem servidor próprio de sessão. O token fica apenas em memória de renderização (`sessionStorage`), não sendo salvo em nenhuma parte do banco de dados e nunca sendo impresso nos logs do console.
 - **Uso em Produção:** Em ambientes comerciais reais de produção, deve-se evoluir para o uso de Cookies seguros `HttpOnly` associados ao domínio do proxy ou criar sessões temporárias assinadas no backend (`streamSessionId` de curta duração na memória do servidor para o token real do Google).
-
-
-
-#   w a t c h 2 g e t h e r  
- 
