@@ -201,3 +201,5 @@ No MVP, a tag nativa `<video>` do navegador realiza solicitações GET diretas e
 
 
 
+#   w a t c h 2 g e t h e r  
+ 
