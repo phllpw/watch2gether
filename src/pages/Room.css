@@ -164,11 +164,15 @@
    2. Full Room View - Layout & Header Bar
    -------------------------------------------------------------------------- */
 .room-page-layout {
+  position: relative;
   display: flex;
   flex-direction: column;
   min-height: 100vh;
   width: 100%;
-  background: transparent;
+  background-color: #060609;
+  color: #f4f4f7;
+  overflow-x: clip;
+  isolation: isolate;
 }
 
 .room-navbar.studio-header {
@@ -267,7 +271,7 @@
 .nav-room-badge {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: 6px;
   font-family: var(--font-mono, monospace);
   font-size: 0.72rem;
   font-weight: 600;
@@ -278,6 +282,28 @@
   color: #cbd5e1;
   white-space: nowrap;
   flex-shrink: 0;
+}
+
+.nav-room-badge.clickable {
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+
+.nav-room-badge.clickable:hover {
+  background: rgba(168, 85, 247, 0.16);
+  border-color: rgba(168, 85, 247, 0.4);
+  color: #ffffff;
+  transform: translateY(-1px);
+}
+
+.badge-copy-state {
+  color: #71717a;
+  margin-left: 1px;
+  transition: color 0.18s ease;
+}
+
+.badge-copy-state.copied {
+  color: #34d399;
 }
 
 .badge-live-icon {

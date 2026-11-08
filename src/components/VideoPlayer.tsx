@@ -23,7 +23,9 @@ import {
   RotateCw,
   Upload,
   Lock,
-  PictureInPicture2
+  PictureInPicture2,
+  FolderOpen,
+  ArrowRight
 } from 'lucide-react';
 import { database, isConfigured, auth, clientUserId } from '../firebase';
 import { ref, onValue, set, push, onDisconnect } from 'firebase/database';
@@ -1701,71 +1703,110 @@ export default function VideoPlayer({
     </div>
   );
 
-  // 1. URL Input View (No video loaded)
+  // 1. Studio Media Dock (No video loaded)
   if (!videoInfo) {
     return (
       <div className="player-container-stack">
         {renderPermissionAndLobbyBar()}
-        <div className="player-empty-state glass animate-fade-in">
-          <div className="empty-content">
-            <div className="link-icon-container">
-              <Link2 size={32} className="purple-glow-icon" />
+
+        <div className="cinema-media-dock animate-fade-in">
+          {/* Top Console Bar */}
+          <div className="dock-console-top">
+            <div className="dock-console-status">
+              <span className="dock-beacon-led" />
+              <span className="dock-console-title">PROJETOR DE CINEMA • SELECIONE A TRANSMISSÃO</span>
             </div>
-            <h2>Adicionar Vídeo à Party</h2>
+            <div className="dock-latency-badge">
+              <Sparkles size={11} />
+              <span>Sincronização em Tempo Real (Δ &lt; 15ms)</span>
+            </div>
+          </div>
+
+          <div className="dock-main-body">
             {canControl ? (
               <>
-                <p>
-                  Escolha um filme do seu <strong>Google Drive</strong>, cole um link do{' '}
-                  <strong>YouTube</strong> ou um link direto de vídeo (<code>.mp4</code>,{' '}
-                  <code>.webm</code>).
-                </p>
+                <div className="dock-cards-grid">
+                  {/* Option 1: Google Drive Card */}
+                  <div className="dock-source-card drive-card">
+                    <div className="source-card-badge">RECOMENDADO</div>
+                    <div className="source-card-icon-box drive">
+                      <FolderOpen size={24} />
+                    </div>
+                    <div className="source-card-text">
+                      <h3>Google Drive</h3>
+                      <p>
+                        Transmita qualquer filme ou série do seu Drive em qualidade original, sem compressão e com play/pause 100% sincronizado.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleGoogleDriveSelect}
+                      className="btn-dock-action drive"
+                    >
+                      <FolderOpen size={16} />
+                      <span>Escolher do Google Drive</span>
+                    </button>
+                  </div>
 
-                <div className="picker-button-container">
-                  <button onClick={handleGoogleDriveSelect} className="btn btn-primary w-full">
-                    📂 Escolher do Google Drive
-                  </button>
+                  {/* Option 2: YouTube / Web Video Card */}
+                  <div className="dock-source-card url-card">
+                    <div className="source-card-badge alt">LINK EXTERNO</div>
+                    <div className="source-card-icon-box web">
+                      <Video size={24} />
+                    </div>
+                    <div className="source-card-text">
+                      <h3>YouTube ou Link Web</h3>
+                      <p>
+                        Cole links de vídeos do YouTube ou qualquer link direto <code>.mp4</code> para assistir junto com a sala.
+                      </p>
+                    </div>
+                    <form onSubmit={handleAddVideo} className="dock-url-form">
+                      <div className="dock-input-wrapper">
+                        <Link2 size={14} className="dock-input-glyph" />
+                        <input
+                          type="text"
+                          className="dock-url-input"
+                          placeholder="Cole link do YouTube ou .mp4..."
+                          value={inputUrl}
+                          onChange={(e) => setInputUrl(e.target.value)}
+                          required
+                        />
+                      </div>
+                      <button type="submit" className="btn-dock-action url">
+                        <span>Carregar Vídeo</span>
+                        <ArrowRight size={15} />
+                      </button>
+                    </form>
+                  </div>
                 </div>
 
-                <div className="divider-container">
-                  <span className="divider-line"></span>
-                  <span className="divider-text">ou cole um link (YouTube, Drive ou Web)</span>
-                  <span className="divider-line"></span>
-                </div>
-
-                <form onSubmit={handleAddVideo} className="url-form">
-                  <input
-                    type="text"
-                    className="input-field url-input"
-                    placeholder="https://www.youtube.com/watch?v=... ou link .mp4"
-                    value={inputUrl}
-                    onChange={(e) => setInputUrl(e.target.value)}
-                    required
-                  />
-                  <button type="submit" className="btn btn-secondary w-full">
-                    Carregar Vídeo Sincronizado
-                  </button>
-                </form>
-
-                <div className="instructions-card">
-                  <h4>💡 Fontes com Sincronização Automática (Play/Pause Juntos)</h4>
-                  <ul>
-                    <li>
-                      <strong>Google Drive:</strong> Clique em "Escolher do Google Drive" — o
-                      vídeo abrirá automaticamente sincronizado para todos na sala!
-                    </li>
-                    <li>
-                      <strong>YouTube:</strong> Cole qualquer link de vídeo do YouTube (
-                      <code>youtube.com/watch?v=...</code> ou <code>youtu.be/...</code>).
-                    </li>
-                    <li>
-                      <strong>Link Direto / Teste Local:</strong> Cole um link direto{' '}
-                      <code>.mp4</code> ou digite <code>/test-video.mp4</code> para testar.
-                    </li>
-                  </ul>
+                {/* Bottom Cinema Features Ribbon */}
+                <div className="dock-features-ribbon">
+                  <span className="ribbon-chip">
+                    <CheckCircle2 size={12} /> Play & Pause Sincronizados
+                  </span>
+                  <span className="ribbon-chip">
+                    <Subtitles size={12} /> Legendas .SRT Compartilhadas
+                  </span>
+                  <span className="ribbon-chip">
+                    <Volume2 size={12} /> Volume Individual
+                  </span>
+                  <span className="ribbon-chip">
+                    <MessageSquare size={12} /> Chat na Tela
+                  </span>
                 </div>
               </>
             ) : (
-              <p>Aguardando o Host selecionar o filme ou vídeo para iniciar a sessão...</p>
+              <div className="dock-guest-waiting">
+                <div className="waiting-spinner-beacon">
+                  <span className="spinner-halo" />
+                  <Video size={30} className="waiting-icon" />
+                </div>
+                <h3>Cabine de Transmissão Pronta</h3>
+                <p>
+                  O anfitrião da sala está selecionando o filme para iniciar a exibição sincronizada. Prepare a pipoca!
+                </p>
+              </div>
             )}
           </div>
         </div>

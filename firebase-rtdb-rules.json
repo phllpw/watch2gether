@@ -1,22 +1,125 @@
 {
   "rules": {
-    /* 
-      ATENÇÃO: Estas regras de segurança são projetadas apenas para o MVP.
-      NÃO use esta configuração aberta em ambiente de produção!
-      Qualquer pessoa com acesso à URL do banco de dados poderá ler e escrever nos caminhos.
-    */
+    ".read": false,
+    ".write": false,
     "rooms": {
       "$roomId": {
-        // Permite que qualquer pessoa leia e modifique informações da sala (vídeo e status de reprodução)
-        ".read": "true",
-        ".write": "true",
+        ".validate": "$roomId.matches(/^[A-Za-z0-9_-]{1,64}$/)",
+        ".read": true,
 
-        // Validação de dados do chat para evitar mensagens vazias ou gigantes
+        "createdAt": {
+          ".write": "!data.exists()",
+          ".validate": "newData.isNumber()"
+        },
+
+        "hostId": {
+          ".write": true,
+          ".validate": "newData.isString() && newData.val().length <= 128"
+        },
+
+        "settings": {
+          ".write": true,
+          ".validate": "newData.hasChildren(['controlMode'])",
+          "controlMode": {
+            ".validate": "newData.val() == 'anyone' || newData.val() == 'host'"
+          },
+          "pin": {
+            ".validate": "newData.isString() && newData.val().length <= 32"
+          },
+          "roomTitle": {
+            ".validate": "newData.isString() && newData.val().length <= 100"
+          },
+          "$other": { ".validate": false }
+        },
+
+        "video": {
+          ".write": true,
+          ".validate": "newData.hasChildren(['source']) && (newData.child('source').val() == 'manual' || newData.child('source').val() == 'drive-oauth' || newData.child('source').val() == 'youtube')",
+          "source": { ".validate": "newData.isString()" },
+          "driveFileId": { ".validate": "newData.isString() && newData.val().matches(/^[A-Za-z0-9_-]{1,128}$/)" },
+          "youtubeId": { ".validate": "newData.isString() && newData.val().matches(/^[A-Za-z0-9_-]{6,32}$/)" },
+          "name": { ".validate": "newData.isString() && newData.val().length <= 300" },
+          "mimeType": { ".validate": "newData.isString() && newData.val().length <= 100" },
+          "size": { ".validate": "newData.isNumber() && newData.val() >= 0" },
+          "accessToken": { ".validate": "newData.isString() && newData.val().length <= 4096" },
+          "previewUrl": { ".validate": "newData.isString() && newData.val().length <= 2048 && newData.val().matches(/^https:\\/\\//)" },
+          "directUrl": { ".validate": "newData.isString() && newData.val().length <= 2048 && newData.val().matches(/^(https?:\\/\\/|\\/)/)" },
+          "updatedAt": { ".validate": "newData.isNumber()" },
+          "updatedBy": { ".validate": "newData.isString() && newData.val().length <= 128" },
+          "$other": { ".validate": false }
+        },
+
+        "videoUrl": {
+          ".write": "!newData.exists()"
+        },
+
+        "playback": {
+          ".write": true,
+          ".validate": "newData.hasChildren(['status', 'isPlaying', 'currentTime', 'duration', 'updatedAt', 'updatedBy', 'action', 'seq'])",
+          "status": { ".validate": "newData.val() == 'playing' || newData.val() == 'paused'" },
+          "isPlaying": { ".validate": "newData.isBoolean()" },
+          "currentTime": { ".validate": "newData.isNumber() && newData.val() >= 0" },
+          "duration": { ".validate": "newData.isNumber() && newData.val() >= 0" },
+          "updatedAt": { ".validate": "newData.isNumber()" },
+          "updatedBy": { ".validate": "newData.isString() && newData.val().length <= 128" },
+          "updatedByName": { ".validate": "newData.isString() && newData.val().length <= 60" },
+          "action": { ".validate": "newData.val() == 'play' || newData.val() == 'pause' || newData.val() == 'seek' || newData.val() == 'heartbeat'" },
+          "seq": { ".validate": "newData.isNumber()" },
+          "$other": { ".validate": false }
+        },
+
+        "subtitle": {
+          ".write": true,
+          "name": { ".validate": "newData.isString() && newData.val().length <= 200" },
+          "content": { ".validate": "newData.isString() && newData.val().length <= 600000" },
+          "uploadedBy": { ".validate": "newData.isString() && newData.val().length <= 60" },
+          "updatedAt": { ".validate": "newData.isNumber()" },
+          "$other": { ".validate": false }
+        },
+
+        "reactions": {
+          ".write": true,
+          "$reactionId": {
+            ".validate": "newData.hasChildren(['emoji', 'sender', 'timestamp'])",
+            "emoji": { ".validate": "newData.isString() && newData.val().length <= 16" },
+            "sender": { ".validate": "newData.isString() && newData.val().length <= 50" },
+            "timestamp": { ".validate": "newData.isNumber()" },
+            "$other": { ".validate": false }
+          }
+        },
+
+        "lobby": {
+          ".write": true,
+          "participants": {
+            "$participantId": {
+              "nickname": { ".validate": "newData.isString() && newData.val().length <= 50" },
+              "ready": { ".validate": "newData.isBoolean()" },
+              "isHost": { ".validate": "newData.isBoolean()" },
+              "updatedAt": { ".validate": "newData.isNumber()" },
+              "$other": { ".validate": false }
+            }
+          },
+          "countdown": {
+            "startedAt": { ".validate": "newData.isNumber()" },
+            "startedBy": { ".validate": "newData.isString() && newData.val().length <= 128" },
+            "startedByName": { ".validate": "newData.isString() && newData.val().length <= 60" },
+            "$other": { ".validate": false }
+          },
+          "$other": { ".validate": false }
+        },
+
         "chat": {
           "$messageId": {
-            ".validate": "newData.hasChildren(['sender', 'text', 'timestamp']) && newData.child('text').val().length > 0 && newData.child('text').val().length < 500 && newData.child('sender').val().length > 0"
+            ".write": "!data.exists() && newData.exists()",
+            ".validate": "newData.hasChildren(['sender', 'text', 'timestamp'])",
+            "sender": { ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 50" },
+            "text": { ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length < 500" },
+            "timestamp": { ".validate": "newData.val() == now" },
+            "$other": { ".validate": false }
           }
-        }
+        },
+
+        "$other": { ".validate": false }
       }
     }
   }

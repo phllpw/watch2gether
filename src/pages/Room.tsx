@@ -5,7 +5,6 @@ import {
   Film,
   User,
   Lock,
-  MessageCircle,
   Share2,
   Check,
   Copy,
@@ -17,11 +16,7 @@ import Chat from '../components/Chat';
 import ShareModal from '../components/ShareModal';
 import { database, isConfigured, authReady, auth, clientUserId } from '../firebase';
 import { ref, get, set, onValue, serverTimestamp } from 'firebase/database';
-import {
-  saveRecentRoom,
-  shareToWhatsApp,
-  shareToInstagramOrNative
-} from '../lib/roomStorage';
+import { saveRecentRoom } from '../lib/roomStorage';
 import './Room.css';
 
 interface InitRoomData {
@@ -67,7 +62,6 @@ export default function Room() {
   const [pinInput, setPinInput] = useState<string>('');
   const [pinError, setPinError] = useState<string>('');
   const [isPinUnlocked, setIsPinUnlocked] = useState<boolean>(true);
-  const [shareFeedback, setShareFeedback] = useState<string>('');
   const [copiedLink, setCopiedLink] = useState<boolean>(false);
   const [isShareModalOpen, setIsShareModalOpen] = useState<boolean>(false);
 
@@ -285,14 +279,6 @@ export default function Room() {
     }
   };
 
-  const handleQuickInsta = async () => {
-    const res = await shareToInstagramOrNative(actualRoomId, roomTitle, roomPin);
-    if (res === 'copied') {
-      setShareFeedback('Convite copiado! Cole no Direct do Insta 📸');
-      setTimeout(() => setShareFeedback(''), 3500);
-    }
-  };
-
   const handleCopyInvite = () => {
     const inviteLink = `${window.location.origin}/room/${actualRoomId}`;
     navigator.clipboard.writeText(inviteLink).then(() => {
@@ -443,8 +429,12 @@ export default function Room() {
   // 4. Full Room View
   return (
     <div className="room-page-layout">
-      {shareFeedback && <div className="room-share-toast glass">{shareFeedback}</div>}
-
+      {/* Ambient Lighting & Micro Mesh (Matching Home Studio Identity) */}
+      <div className="ambient-mesh-canvas" aria-hidden="true">
+        <div className="ambient-violet-spot" />
+        <div className="ambient-amber-spot" />
+        <div className="ambient-grid-overlay" />
+      </div>
       {/* Navigation Header */}
       <header className="room-navbar studio-header">
         <div className="nav-left">
@@ -462,20 +452,30 @@ export default function Room() {
               </span>
             </div>
           </div>
-          <span className="nav-room-badge" title="Código único da sala">
+          <button
+            type="button"
+            onClick={handleCopyInvite}
+            className="nav-room-badge clickable"
+            title="Clique para copiar o código e link da sala"
+          >
             {roomPin ? (
               <Lock size={11} className="badge-lock-icon" />
             ) : (
               <Radio size={11} className="badge-live-icon" />
             )}
             <span>{actualRoomId}</span>
-          </span>
+            {copiedLink ? (
+              <Check size={11} className="badge-copy-state copied" />
+            ) : (
+              <Copy size={11} className="badge-copy-state" />
+            )}
+          </button>
         </div>
 
         <div className="nav-right">
-          {/* Quick Share Actions: Unified Compartilhar, WhatsApp, Instagram, Link */}
+          {/* Quick Share Actions */}
           <div className="nav-share-group">
-            {/* Primary Unified Share Trigger */}
+            {/* Primary Unified Share Trigger (opens WhatsApp, Instagram, Native Sheet, Link) */}
             <button
               type="button"
               onClick={() => setIsShareModalOpen(true)}
@@ -484,39 +484,6 @@ export default function Room() {
             >
               <Share2 size={14} />
               <span>Compartilhar</span>
-            </button>
-
-            {/* Quick 1-click WhatsApp */}
-            <button
-              type="button"
-              onClick={() => shareToWhatsApp(actualRoomId, roomTitle, roomPin)}
-              className="btn-nav-share whatsapp hide-mobile"
-              title="Enviar convite no WhatsApp (escolher contato)"
-            >
-              <MessageCircle size={14} />
-              <span>WhatsApp</span>
-            </button>
-
-            {/* Quick 1-click Instagram */}
-            <button
-              type="button"
-              onClick={handleQuickInsta}
-              className="btn-nav-share instagram hide-mobile"
-              title="Copiar convite e abrir Instagram Direct"
-            >
-              <Share2 size={14} />
-              <span>Instagram</span>
-            </button>
-
-            {/* Quick Copy Link */}
-            <button
-              type="button"
-              onClick={handleCopyInvite}
-              className={`btn-nav-share copy ${copiedLink ? 'copied' : ''}`}
-              title="Copiar link direto da sala"
-            >
-              {copiedLink ? <Check size={14} /> : <Copy size={14} />}
-              <span className="hide-mobile">{copiedLink ? 'Copiado!' : 'Link'}</span>
             </button>
           </div>
 

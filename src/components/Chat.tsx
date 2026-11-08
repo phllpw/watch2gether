@@ -18,11 +18,44 @@ interface ChatProps {
   roomPin?: string;
 }
 
+const QUICK_EMOJIS = ['🍿', '❤️', '😂', '🔥', '😱', '👏'];
+const QUICK_PHRASES = ['🍿 Pipoca pronta!', '🎬 Bora play!', '⏸️ Peraí 1 seg', '🔊 Aumenta o som!'];
+
 export default function Chat({ roomId, nickname }: ChatProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState('');
   const [copied, setCopied] = useState(false);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
+
+  const sendRawMessage = async (text: string) => {
+    if (!text.trim()) return;
+    const messageData = {
+      sender: nickname,
+      text: text.trim(),
+      timestamp: isConfigured ? serverTimestamp() : Date.now()
+    };
+
+    if (isConfigured && database) {
+      try {
+        const chatRef = ref(database, `rooms/${roomId}/chat`);
+        await push(chatRef, messageData);
+      } catch (error) {
+        console.error('Erro ao enviar mensagem:', error);
+      }
+    } else {
+      const localMsg: Message = {
+        id: `local-${Date.now()}`,
+        sender: nickname,
+        text: messageData.text,
+        timestamp: Date.now()
+      };
+      setMessages((prev) => [...prev, localMsg]);
+    }
+  };
+
+  const handleQuickSend = (text: string) => {
+    sendRawMessage(text);
+  };
 
   // Load and listen to messages
   useEffect(() => {
@@ -75,44 +108,9 @@ export default function Chat({ roomId, nickname }: ChatProps) {
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!inputText.trim()) return;
-
-    const messageData = {
-      sender: nickname,
-      text: inputText.trim(),
-      timestamp: isConfigured ? serverTimestamp() : Date.now()
-    };
-
+    const text = inputText.trim();
     setInputText('');
-
-    if (isConfigured && database) {
-      try {
-        const chatRef = ref(database, `rooms/${roomId}/chat`);
-        await push(chatRef, messageData);
-      } catch (error) {
-        console.error('Erro ao enviar mensagem:', error);
-      }
-    } else {
-      const localMsg: Message = {
-        id: `local-${Date.now()}`,
-        sender: nickname,
-        text: messageData.text,
-        timestamp: messageData.timestamp as number
-      };
-
-      setMessages((prev) => [...prev, localMsg]);
-
-      setTimeout(() => {
-        setMessages((prev) => [
-          ...prev,
-          {
-            id: `reply-${Date.now()}`,
-            sender: 'Amigo Virtual (Demo)',
-            text: `Recebido! Sincronização funcionando para: "${messageData.text}"`,
-            timestamp: Date.now()
-          }
-        ]);
-      }, 1200);
-    }
+    await sendRawMessage(text);
   };
 
   const copyRoomLink = () => {
@@ -124,7 +122,7 @@ export default function Chat({ roomId, nickname }: ChatProps) {
   };
 
   return (
-    <div className="chat-container glass">
+    <div className="chat-container studio-chat">
       {/* Chat Header */}
       <div className="chat-header">
         <div className="chat-info">
@@ -132,17 +130,20 @@ export default function Chat({ roomId, nickname }: ChatProps) {
             <MessageSquare size={16} className="chat-header-icon" />
           </div>
           <div className="chat-title-meta">
-            <h3>Chat ao Vivo</h3>
-            <span className="room-code-tag">Você: {nickname}</span>
+            <div className="chat-title-row">
+              <h3>Chat da Sessão</h3>
+              <span className="chat-live-pulse-dot" />
+            </div>
+            <span className="room-code-tag">Você: {nickname} • Em sincronia</span>
           </div>
         </div>
         <button
           type="button"
           onClick={copyRoomLink}
           className={`btn-icon-copy ${copied ? 'copied' : ''}`}
-          title="Copiar Link de Convite"
+          title="Copiar Link de Convite da Sala"
         >
-          {copied ? <Check size={14} /> : <Copy size={14} />}
+          {copied ? <Check size={13} /> : <Copy size={13} />}
           <span>{copied ? 'Copiado!' : 'Convidar'}</span>
         </button>
       </div>
@@ -159,8 +160,11 @@ export default function Chat({ roomId, nickname }: ChatProps) {
       <div ref={messagesContainerRef} className="chat-messages">
         {messages.length === 0 ? (
           <div className="chat-empty-placeholder">
-            <MessageSquare size={24} />
-            <p>Nenhuma mensagem ainda. Mande um "Oi" para começar a sessão! 🍿</p>
+            <div className="chat-empty-beacon">
+              <MessageSquare size={22} className="beacon-glyph" />
+            </div>
+            <h4>Sala Conectada</h4>
+            <p>Mande uma mensagem ou toque em uma das reações rápidas abaixo para interagir na tela ao vivo!</p>
           </div>
         ) : (
           messages.map((msg) => {
@@ -193,18 +197,47 @@ export default function Chat({ roomId, nickname }: ChatProps) {
         )}
       </div>
 
+      {/* Quick Interactive Reaction Bar */}
+      <div className="chat-quick-reactions-bar">
+        <div className="emoji-quick-row">
+          {QUICK_EMOJIS.map((emoji) => (
+            <button
+              key={emoji}
+              type="button"
+              onClick={() => handleQuickSend(emoji)}
+              className="btn-quick-emoji"
+              title={`Enviar ${emoji}`}
+            >
+              <span>{emoji}</span>
+            </button>
+          ))}
+        </div>
+        <div className="phrase-quick-scroll">
+          {QUICK_PHRASES.map((phrase) => (
+            <button
+              key={phrase}
+              type="button"
+              onClick={() => handleQuickSend(phrase)}
+              className="btn-quick-phrase"
+            >
+              <span>{phrase}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
       {/* Input area */}
       <form onSubmit={handleSendMessage} className="chat-input-area">
         <input
           type="text"
           value={inputText}
           onChange={(e) => setInputText(e.target.value)}
-          placeholder="Digite sua mensagem..."
+          placeholder="Digite sua mensagem na party..."
           className="input-field chat-input"
           maxLength={500}
         />
         <button type="submit" className="btn btn-primary btn-send" disabled={!inputText.trim()}>
-          <Send size={16} />
+          <Send size={15} />
         </button>
       </form>
     </div>
