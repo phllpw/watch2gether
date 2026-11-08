@@ -824,6 +824,28 @@
   border-radius: 0;
 }
 
+/* Web Cinema Fullscreen for iOS Safari and mobile devices */
+.video-viewport.is-css-fullscreen {
+  position: fixed !important;
+  inset: 0 !important;
+  top: 0 !important;
+  left: 0 !important;
+  width: 100vw !important;
+  height: 100dvh !important;
+  max-height: 100dvh !important;
+  z-index: 999999 !important;
+  border-radius: 0 !important;
+  background: #000000 !important;
+}
+
+body.cinema-viewport-fullscreen-active {
+  overflow: hidden !important;
+  position: fixed !important;
+  width: 100vw !important;
+  height: 100dvh !important;
+  touch-action: none !important;
+}
+
 .video-element-container {
   position: relative;
   width: 100%;
@@ -923,7 +945,7 @@
   left: 0;
   right: 0;
   bottom: 0;
-  z-index: 15;
+  z-index: 40 !important;
   padding: 18px 14px 10px;
   background: linear-gradient(
     to top,
@@ -1195,15 +1217,24 @@
   color: #ffffff;
 }
 
-/* Custom Subtitle Overlay inside Viewport */
+/* Custom Subtitle Overlay inside Viewport (elevated on top of video) */
 .custom-subtitle-overlay {
   position: absolute;
   left: 6%;
   right: 6%;
   bottom: 82px;
-  z-index: 12;
+  z-index: 25 !important;
   text-align: center;
   pointer-events: none;
+  transition: bottom 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.custom-subtitle-overlay.hud-visible {
+  bottom: max(82px, calc(76px + env(safe-area-inset-bottom)));
+}
+
+.custom-subtitle-overlay.hud-hidden {
+  bottom: max(24px, calc(18px + env(safe-area-inset-bottom)));
 }
 
 .custom-subtitle-overlay.size-sm .subtitle-box {
@@ -1230,19 +1261,50 @@
   text-shadow: 0 2px 4px rgba(0, 0, 0, 0.9);
 }
 
-/* Bottom Chat Notification Overlay (for Fullscreen / Video) */
+/* Bottom Chat Notification Overlay (for Fullscreen / Video on iOS, Android & PC) */
 .screen-chat-toast-stack {
   position: absolute;
   left: 50%;
   transform: translateX(-50%);
   bottom: 78px;
-  z-index: 14;
+  z-index: 35 !important;
   display: flex;
   flex-direction: column;
   gap: 6px;
   width: 92%;
   max-width: 520px;
   pointer-events: auto;
+  transition: bottom 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.screen-chat-toast-stack.hud-visible {
+  bottom: max(78px, calc(72px + env(safe-area-inset-bottom)));
+}
+
+.screen-chat-toast-stack.hud-hidden {
+  bottom: max(20px, calc(16px + env(safe-area-inset-bottom)));
+}
+
+@media (max-height: 500px) {
+  .screen-chat-toast-stack {
+    max-width: 82%;
+  }
+  .screen-chat-toast-stack.hud-visible {
+    bottom: max(62px, calc(56px + env(safe-area-inset-bottom)));
+  }
+  .screen-chat-toast-stack.hud-hidden {
+    bottom: max(12px, calc(8px + env(safe-area-inset-bottom)));
+  }
+  .screen-chat-toast {
+    padding: 5px 10px;
+    font-size: 0.72rem;
+  }
+  .custom-subtitle-overlay.hud-visible {
+    bottom: max(64px, calc(58px + env(safe-area-inset-bottom)));
+  }
+  .custom-subtitle-overlay.hud-hidden {
+    bottom: max(16px, calc(10px + env(safe-area-inset-bottom)));
+  }
 }
 
 .screen-chat-toast {
@@ -1311,7 +1373,7 @@
   inset: 0;
   pointer-events: none;
   overflow: hidden;
-  z-index: 13;
+  z-index: 28 !important;
 }
 
 .floating-reaction-bubble {
@@ -1361,7 +1423,7 @@
 .countdown-cinema-overlay {
   position: absolute;
   inset: 0;
-  z-index: 25;
+  z-index: 38 !important;
   background: rgba(6, 6, 10, 0.86);
   backdrop-filter: blur(8px);
   display: flex;

@@ -192,6 +192,8 @@ export default function VideoPlayer({
   });
   const [isMuted, setIsMuted] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isCssFullscreen, setIsCssFullscreen] = useState(false);
+  const effectiveFullscreen = isFullscreen || isCssFullscreen;
   const [hudVisible, setHudVisible] = useState(true);
   const [showSettingsMenu, setShowSettingsMenu] = useState(false);
   const [playbackSpeed, setPlaybackSpeed] = useState<number>(1);
@@ -335,7 +337,7 @@ export default function VideoPlayer({
     }
   }, [localIsPlaying, showSettingsMenu]);
 
-  // Track Fullscreen changes on document
+  // Track Native Fullscreen changes on document
   useEffect(() => {
     const onFsChange = () => {
       const fsEl =
@@ -343,6 +345,10 @@ export default function VideoPlayer({
         (document as any).webkitFullscreenElement ||
         null;
       setIsFullscreen(Boolean(fsEl));
+      if (!fsEl && isCssFullscreen) {
+        setIsCssFullscreen(false);
+        document.body.classList.remove('cinema-viewport-fullscreen-active');
+      }
     };
     document.addEventListener('fullscreenchange', onFsChange);
     document.addEventListener('webkitfullscreenchange', onFsChange);
@@ -350,7 +356,33 @@ export default function VideoPlayer({
       document.removeEventListener('fullscreenchange', onFsChange);
       document.removeEventListener('webkitfullscreenchange', onFsChange);
     };
-  }, []);
+  }, [isCssFullscreen]);
+
+  // Handle Escape key & cleanup for Web Cinema Fullscreen (iOS / Mobile fallback)
+  useEffect(() => {
+    if (!isCssFullscreen) {
+      document.body.classList.remove('cinema-viewport-fullscreen-active');
+      return;
+    }
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setIsCssFullscreen(false);
+        document.body.classList.remove('cinema-viewport-fullscreen-active');
+        try {
+          (screen.orientation as any)?.unlock?.();
+        } catch {
+          // ignore
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      document.body.classList.remove('cinema-viewport-fullscreen-active');
+    };
+  }, [isCssFullscreen]);
 
   const lockRemoteApply = useCallback((ms = 750) => {
     isApplyingRemoteRef.current = true;
@@ -1209,21 +1241,56 @@ export default function VideoPlayer({
     const container = viewportRef.current;
     if (!container) return;
 
-    const fsEl =
-      document.fullscreenElement || (document as any).webkitFullscreenElement;
-    if (!fsEl) {
-      if (container.requestFullscreen) {
-        container.requestFullscreen().catch(() => {});
-      } else if ((container as any).webkitRequestFullscreen) {
-        (container as any).webkitRequestFullscreen();
-      } else if ((videoRef.current as any)?.webkitEnterFullscreen) {
-        (videoRef.current as any).webkitEnterFullscreen();
+    const isIos =
+      typeof navigator !== 'undefined' &&
+      (/iPad|iPhone|iPod/.test(navigator.userAgent) ||
+        (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1));
+
+    if (effectiveFullscreen) {
+      if (isCssFullscreen) {
+        setIsCssFullscreen(false);
+        document.body.classList.remove('cinema-viewport-fullscreen-active');
+      }
+      const fsEl =
+        document.fullscreenElement || (document as any).webkitFullscreenElement;
+      if (fsEl) {
+        if (document.exitFullscreen) {
+          document.exitFullscreen().catch(() => {});
+        } else if ((document as any).webkitExitFullscreen) {
+          (document as any).webkitExitFullscreen();
+        }
+      }
+      try {
+        (screen.orientation as any)?.unlock?.();
+      } catch {
+        // ignore
       }
     } else {
-      if (document.exitFullscreen) {
-        document.exitFullscreen().catch(() => {});
-      } else if ((document as any).webkitExitFullscreen) {
-        (document as any).webkitExitFullscreen();
+      // On iOS devices or where container.requestFullscreen is not supported on elements,
+      // use CSS Viewport Fullscreen so overlays (chat toasts, reactions, subtitles, HUD) remain fully rendered!
+      if (isIos || !container.requestFullscreen) {
+        setIsCssFullscreen(true);
+        document.body.classList.add('cinema-viewport-fullscreen-active');
+        try {
+          (screen.orientation as any)?.lock?.('landscape').catch(() => {});
+        } catch {
+          // ignore
+        }
+      } else {
+        container
+          .requestFullscreen()
+          .then(() => {
+            try {
+              (screen.orientation as any)?.lock?.('landscape').catch(() => {});
+            } catch {
+              // ignore
+            }
+          })
+          .catch(() => {
+            // Browser rejected or blocked native fullscreen -> fallback seamlessly to CSS Fullscreen
+            setIsCssFullscreen(true);
+            document.body.classList.add('cinema-viewport-fullscreen-active');
+          });
       }
     }
   };
@@ -2068,66 +2135,12 @@ export default function VideoPlayer({
         {/* Main viewport (Fullscreen target so custom HUD, subtitles, reactions & chat appear in Fullscreen!) */}
         <div
           ref={viewportRef}
-          className={`video-viewport filter-${videoFilter} ${isFullscreen ? 'is-fullscreen' : ''}`}
+          className={`video-viewport filter-${videoFilter} ${effectiveFullscreen ? 'is-fullscreen' : ''} ${isCssFullscreen ? 'is-css-fullscreen' : ''}`}
           onMouseMove={pokeHud}
           onTouchStart={pokeHud}
           onClick={pokeHud}
         >
-          {/* Countdown 3, 2, 1 Overlay */}
-          {countdownStep && (
-            <div className="countdown-cinema-overlay">
-              <div className="countdown-number">{countdownStep}</div>
-              <p>Prepare a pipoca! Sessão sincronizada iniciando...</p>
-            </div>
-          )}
-
-          {/* Floating Live Reactions Overlay */}
-          <div className="floating-reactions-layer">
-            {floatingReactions.map((r) => (
-              <div
-                key={r.id}
-                className="floating-reaction-bubble"
-                style={{ left: `${r.leftPercent}%` }}
-              >
-                <span className="reaction-emoji">{r.emoji}</span>
-                <span className="reaction-sender">{r.sender}</span>
-              </div>
-            ))}
-          </div>
-
-          {/* Synchronized Subtitle Overlay (works in Fullscreen on PC & Mobile!) */}
-          {activeSubtitleText && (
-            <div className={`custom-subtitle-overlay size-${subtitleSize}`}>
-              <span className="subtitle-box">{activeSubtitleText}</span>
-            </div>
-          )}
-
-          {/* Bottom Chat Notification Overlay (when someone sends a message during fullscreen/video!) */}
-          {showChatOnScreen && screenChatToasts.length > 0 && (
-            <div className="screen-chat-toast-stack">
-              {screenChatToasts.map((t) => (
-                <div key={t.id} className="screen-chat-toast">
-                  <div className="screen-chat-content">
-                    <span className="screen-chat-sender">💬 {t.sender}:</span>
-                    <span className="screen-chat-text">{t.text}</span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleToggleChatOnScreen();
-                    }}
-                    className="btn-mute-screen-chat"
-                    title="Desativar notificações do chat na tela do vídeo"
-                  >
-                    <MessageSquareOff size={12} />
-                    <span>Ocultar</span>
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-
+          {/* Base Media Player Container */}
           {videoError ? (
             <div className="video-error-state">
               <AlertCircle size={40} className="error-icon" />
@@ -2266,6 +2279,69 @@ export default function VideoPlayer({
                   </button>
                 </div>
               )}
+            </div>
+          )}
+
+          {/* Synchronized Subtitle Overlay (works in Fullscreen on PC & Mobile!) */}
+          {activeSubtitleText && (
+            <div
+              className={`custom-subtitle-overlay size-${subtitleSize} ${
+                hudVisible || !localIsPlaying ? 'hud-visible' : 'hud-hidden'
+              }`}
+            >
+              <span className="subtitle-box">{activeSubtitleText}</span>
+            </div>
+          )}
+
+          {/* Floating Live Reactions Overlay */}
+          <div className="floating-reactions-layer">
+            {floatingReactions.map((r) => (
+              <div
+                key={r.id}
+                className="floating-reaction-bubble"
+                style={{ left: `${r.leftPercent}%` }}
+              >
+                <span className="reaction-emoji">{r.emoji}</span>
+                <span className="reaction-sender">{r.sender}</span>
+              </div>
+            ))}
+          </div>
+
+          {/* Bottom Chat Notification Overlay (works in Fullscreen on iOS, Android & PC!) */}
+          {showChatOnScreen && screenChatToasts.length > 0 && (
+            <div
+              className={`screen-chat-toast-stack ${
+                hudVisible || !localIsPlaying ? 'hud-visible' : 'hud-hidden'
+              }`}
+            >
+              {screenChatToasts.map((t) => (
+                <div key={t.id} className="screen-chat-toast">
+                  <div className="screen-chat-content">
+                    <span className="screen-chat-sender">💬 {t.sender}:</span>
+                    <span className="screen-chat-text">{t.text}</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleToggleChatOnScreen();
+                    }}
+                    className="btn-mute-screen-chat"
+                    title="Desativar notificações do chat na tela do vídeo"
+                  >
+                    <MessageSquareOff size={12} />
+                    <span>Ocultar</span>
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Countdown 3, 2, 1 Overlay */}
+          {countdownStep && (
+            <div className="countdown-cinema-overlay">
+              <div className="countdown-number">{countdownStep}</div>
+              <p>Prepare a pipoca! Sessão sincronizada iniciando...</p>
             </div>
           )}
 
@@ -2628,9 +2704,9 @@ export default function VideoPlayer({
                     type="button"
                     onClick={handleToggleFullscreen}
                     className="hud-icon-btn"
-                    title={isFullscreen ? 'Sair da Tela Cheia' : 'Tela Cheia (com legendas e chat)'}
+                    title={effectiveFullscreen ? 'Sair da Tela Cheia' : 'Tela Cheia (com legendas e chat)'}
                   >
-                    {isFullscreen ? <Minimize size={16} /> : <Maximize size={16} />}
+                    {effectiveFullscreen ? <Minimize size={16} /> : <Maximize size={16} />}
                   </button>
                 </div>
               </div>
