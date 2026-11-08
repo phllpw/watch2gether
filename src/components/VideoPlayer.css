@@ -825,25 +825,103 @@
 }
 
 /* Web Cinema Fullscreen for iOS Safari and mobile devices */
-.video-viewport.is-css-fullscreen {
+.player-wrapper.is-fullscreen,
+body.cinema-viewport-fullscreen-active .player-wrapper {
   position: fixed !important;
   inset: 0 !important;
   top: 0 !important;
   left: 0 !important;
   width: 100vw !important;
   height: 100dvh !important;
+  max-width: 100vw !important;
   max-height: 100dvh !important;
   z-index: 999999 !important;
   border-radius: 0 !important;
+  border: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
   background: #000000 !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  box-shadow: none !important;
+  overflow: hidden !important;
 }
 
 body.cinema-viewport-fullscreen-active {
   overflow: hidden !important;
-  position: fixed !important;
+  background: #000000 !important;
+}
+
+body.cinema-viewport-fullscreen-active .player-header,
+body.cinema-viewport-fullscreen-active .player-sync-footer,
+body.cinema-viewport-fullscreen-active .cinema-ambilight-aura,
+body.cinema-viewport-fullscreen-active .theater-lights-banner {
+  display: none !important;
+}
+
+.player-wrapper.is-fullscreen .video-viewport,
+body.cinema-viewport-fullscreen-active .video-viewport {
+  position: absolute !important;
+  inset: 0 !important;
+  top: 0 !important;
+  left: 0 !important;
   width: 100vw !important;
   height: 100dvh !important;
-  touch-action: none !important;
+  max-height: 100dvh !important;
+  border-radius: 0 !important;
+  background: #000000 !important;
+}
+
+.player-wrapper.is-fullscreen .video-element-container,
+body.cinema-viewport-fullscreen-active .video-element-container {
+  width: 100vw !important;
+  height: 100dvh !important;
+}
+
+.player-wrapper.is-fullscreen .video-element,
+body.cinema-viewport-fullscreen-active .video-element {
+  width: 100vw !important;
+  height: 100dvh !important;
+  object-fit: contain !important;
+}
+
+.player-wrapper.is-fullscreen .custom-cinema-hud,
+body.cinema-viewport-fullscreen-active .custom-cinema-hud {
+  position: absolute !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  padding-bottom: max(16px, env(safe-area-inset-bottom)) !important;
+  padding-left: max(16px, env(safe-area-inset-left)) !important;
+  padding-right: max(16px, env(safe-area-inset-right)) !important;
+}
+
+.btn-exit-fullscreen-floating {
+  position: absolute;
+  top: max(14px, env(safe-area-inset-top));
+  right: max(14px, env(safe-area-inset-right));
+  z-index: 45;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(10, 10, 16, 0.85);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  color: #ffffff;
+  padding: 6px 12px;
+  border-radius: var(--radius-full);
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.6);
+  transition: all 0.2s ease;
+  user-select: none;
+}
+
+.btn-exit-fullscreen-floating:hover {
+  background: rgba(255, 255, 255, 0.18);
+  border-color: rgba(255, 255, 255, 0.4);
 }
 
 .video-element-container {

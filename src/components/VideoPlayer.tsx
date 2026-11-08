@@ -318,7 +318,7 @@ export default function VideoPlayer({
       ? 'drive-proxy-html5'
       : 'manual-html5';
 
-  // Auto-hide HUD after 3.2s of mouse inactivity while playing
+  // Auto-hide HUD after 3.5s of inactivity while playing
   const pokeHud = useCallback(() => {
     setHudVisible(true);
     if (hudTimeoutRef.current) {
@@ -328,8 +328,39 @@ export default function VideoPlayer({
       if (localIsPlaying && !showSettingsMenu) {
         setHudVisible(false);
       }
-    }, 3200);
+    }, 3500);
   }, [localIsPlaying, showSettingsMenu]);
+
+  // Handle tap or click on viewport: on mobile, wakes or toggles HUD; never abruptly pauses
+  const handleViewportTap = useCallback(
+    (e: React.MouseEvent | React.TouchEvent) => {
+      const target = e.target as HTMLElement;
+      if (
+        target &&
+        target.closest(
+          'button, input, a, .screen-chat-toast, .hud-controls-row, .hud-progress-track, .paused-status-pill, .btn-exit-fullscreen-floating'
+        )
+      ) {
+        return;
+      }
+
+      if (!hudVisible) {
+        setHudVisible(true);
+        pokeHud();
+      } else {
+        const isTouch = typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches;
+        if (isTouch && localIsPlaying) {
+          setHudVisible(false);
+          if (hudTimeoutRef.current) {
+            window.clearTimeout(hudTimeoutRef.current);
+          }
+        } else {
+          pokeHud();
+        }
+      }
+    },
+    [hudVisible, pokeHud, localIsPlaying]
+  );
 
   useEffect(() => {
     if (!localIsPlaying || showSettingsMenu) {
@@ -2064,7 +2095,7 @@ export default function VideoPlayer({
         onChange={handleSubtitleUpload}
       />
 
-      <div className="player-wrapper glass">
+      <div className={`player-wrapper glass ${effectiveFullscreen ? 'is-fullscreen' : ''}`}>
         {/* Video Title Bar */}
         <div className="player-header">
           <div className="video-title-info">
@@ -2137,9 +2168,23 @@ export default function VideoPlayer({
           ref={viewportRef}
           className={`video-viewport filter-${videoFilter} ${effectiveFullscreen ? 'is-fullscreen' : ''} ${isCssFullscreen ? 'is-css-fullscreen' : ''}`}
           onMouseMove={pokeHud}
-          onTouchStart={pokeHud}
-          onClick={pokeHud}
+          onTouchStart={handleViewportTap}
+          onClick={handleViewportTap}
         >
+          {effectiveFullscreen && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleToggleFullscreen();
+              }}
+              className="btn-exit-fullscreen-floating"
+              title="Sair da Tela Cheia"
+            >
+              <Minimize size={14} />
+              <span>Sair</span>
+            </button>
+          )}
           {/* Base Media Player Container */}
           {videoError ? (
             <div className="video-error-state">
@@ -2243,10 +2288,10 @@ export default function VideoPlayer({
                   onClick={canControl ? handleHudTogglePlay : undefined}
                   style={{ cursor: canControl ? 'pointer' : 'default' }}
                 >
-                  <Pause size={13} className="paused-icon" />
+                  <Play size={13} className="paused-icon" />
                   <span className="paused-text">
                     {pausedByName ? `Pausado por ${pausedByName}` : 'Filme em Pausa'}
-                    {canControl ? ' • Toque para Play' : ' • Aguardando Host'}
+                    {canControl ? ' • Toque para Play ▶️' : ' • Aguardando Host'}
                   </span>
                 </div>
               )}
@@ -2256,7 +2301,15 @@ export default function VideoPlayer({
                 src={processed.stream}
                 controls={false}
                 playsInline
-                onClick={canControl ? handleHudTogglePlay : pokeHud}
+                onClick={(e) => {
+                  const isTouch = typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches;
+                  if (isTouch) {
+                    handleViewportTap(e);
+                  } else {
+                    if (canControl) handleHudTogglePlay();
+                    else pokeHud();
+                  }
+                }}
                 onDoubleClick={handleToggleFullscreen}
                 onLoadedMetadata={handleLoadedMetadata}
                 onTimeUpdate={handleTimeUpdate}
