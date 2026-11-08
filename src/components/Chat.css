@@ -310,40 +310,7 @@
   transform: scale(0.92);
 }
 
-.phrase-quick-scroll {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  overflow-x: auto;
-  padding-bottom: 2px;
-  scrollbar-width: none;
-  -webkit-overflow-scrolling: touch;
-}
 
-.phrase-quick-scroll::-webkit-scrollbar {
-  display: none;
-}
-
-.btn-quick-phrase {
-  white-space: nowrap;
-  font-size: 0.71rem;
-  font-weight: 500;
-  color: #cbd5e1;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 9999px;
-  padding: 4px 10px;
-  cursor: pointer;
-  transition: all 0.16s ease;
-  flex-shrink: 0;
-}
-
-.btn-quick-phrase:hover {
-  color: #ffffff;
-  background: rgba(168, 85, 247, 0.14);
-  border-color: rgba(168, 85, 247, 0.35);
-  transform: translateY(-1px);
-}
 
 .chat-input-area {
   padding: 12px;

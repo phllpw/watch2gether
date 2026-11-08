@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Send, Copy, Check, MessageSquare, AlertTriangle } from 'lucide-react';
 import { database, isConfigured } from '../firebase';
 import { ref, push, onValue, serverTimestamp } from 'firebase/database';
+import { playPopSound } from '../lib/soundEffects';
 import './Chat.css';
 
 interface Message {
@@ -19,7 +20,6 @@ interface ChatProps {
 }
 
 const QUICK_EMOJIS = ['🍿', '❤️', '😂', '🔥', '😱', '👏'];
-const QUICK_PHRASES = ['🍿 Pipoca pronta!', '🎬 Bora play!', '⏸️ Peraí 1 seg', '🔊 Aumenta o som!'];
 
 export default function Chat({ roomId, nickname }: ChatProps) {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -29,6 +29,7 @@ export default function Chat({ roomId, nickname }: ChatProps) {
 
   const sendRawMessage = async (text: string) => {
     if (!text.trim()) return;
+    playPopSound();
     const messageData = {
       sender: nickname,
       text: text.trim(),
@@ -53,8 +54,16 @@ export default function Chat({ roomId, nickname }: ChatProps) {
     }
   };
 
-  const handleQuickSend = (text: string) => {
-    sendRawMessage(text);
+  const handleQuickSend = (emoji: string) => {
+    playPopSound();
+    if (isConfigured && database) {
+      push(ref(database, `rooms/${roomId}/reactions`), {
+        emoji,
+        sender: nickname || 'Convidado',
+        timestamp: Date.now()
+      }).catch(() => {});
+    }
+    sendRawMessage(emoji);
   };
 
   // Load and listen to messages
@@ -209,18 +218,6 @@ export default function Chat({ roomId, nickname }: ChatProps) {
               title={`Enviar ${emoji}`}
             >
               <span>{emoji}</span>
-            </button>
-          ))}
-        </div>
-        <div className="phrase-quick-scroll">
-          {QUICK_PHRASES.map((phrase) => (
-            <button
-              key={phrase}
-              type="button"
-              onClick={() => handleQuickSend(phrase)}
-              className="btn-quick-phrase"
-            >
-              <span>{phrase}</span>
             </button>
           ))}
         </div>

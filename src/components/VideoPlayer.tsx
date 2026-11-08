@@ -6,7 +6,6 @@ import {
   AlertCircle,
   Info,
   Users,
-  Shield,
   Video,
   RefreshCw,
   Volume2,
@@ -25,7 +24,10 @@ import {
   Lock,
   PictureInPicture2,
   FolderOpen,
-  ArrowRight
+  ArrowRight,
+  Crown,
+  ClipboardCopy,
+  Lightbulb
 } from 'lucide-react';
 import { database, isConfigured, auth, clientUserId } from '../firebase';
 import { ref, onValue, set, push, onDisconnect } from 'firebase/database';
@@ -38,6 +40,14 @@ import {
   getDriveCloudProxyStreamUrl
 } from '../lib/googleDrive';
 import { parseSubtitles, formatDuration, type SubtitleCue } from '../lib/subtitles';
+import {
+  playPopSound,
+  playChimeSound,
+  playCountdownBeep,
+  playActionChord,
+  isSoundEnabled,
+  setSoundEnabled
+} from '../lib/soundEffects';
 import './VideoPlayer.css';
 
 interface PlaybackState {
@@ -209,6 +219,20 @@ export default function VideoPlayer({
   const [participants, setParticipants] = useState<Record<string, LobbyParticipant>>({});
   const [isReady, setIsReady] = useState<boolean>(false);
   const [countdownStep, setCountdownStep] = useState<string | null>(null);
+  const [theaterLightsOff, setTheaterLightsOff] = useState<boolean>(false);
+  const [soundActive, setSoundActive] = useState<boolean>(() => isSoundEnabled());
+
+  // Toggle theater lights mode on document.body for cinema atmosphere
+  useEffect(() => {
+    if (theaterLightsOff) {
+      document.body.classList.add('theater-lights-dimmed');
+    } else {
+      document.body.classList.remove('theater-lights-dimmed');
+    }
+    return () => {
+      document.body.classList.remove('theater-lights-dimmed');
+    };
+  }, [theaterLightsOff]);
 
   // Unique client ID per tab/session
   const [userId] = useState<string>(() => {
@@ -616,12 +640,18 @@ export default function VideoPlayer({
         lastCountdownRef.current = data.startedAt;
         return;
       }
-      lastCountdownRef.current = data.startedAt;
-
+      playCountdownBeep(3);
       setCountdownStep('3');
-      window.setTimeout(() => setCountdownStep('2'), 1000);
-      window.setTimeout(() => setCountdownStep('1'), 2000);
       window.setTimeout(() => {
+        playCountdownBeep(2);
+        setCountdownStep('2');
+      }, 1000);
+      window.setTimeout(() => {
+        playCountdownBeep(1);
+        setCountdownStep('1');
+      }, 2000);
+      window.setTimeout(() => {
+        playActionChord();
         setCountdownStep('🍿 AÇÃO!');
         if (canControlRef.current && (isHost || data.startedBy === userId)) {
           if (videoInfo?.source === 'youtube' && ytPlayerRef.current?.playVideo) {
@@ -662,6 +692,7 @@ export default function VideoPlayer({
       if (!item || Math.abs(Date.now() - item.timestamp) > 8000) return;
 
       const reactionId = `${latestKey}`;
+      playPopSound();
       setFloatingReactions((prev) => {
         if (prev.some((r) => r.id === reactionId)) return prev;
         const next: FloatingReaction = {
@@ -1265,6 +1296,7 @@ export default function VideoPlayer({
   };
 
   const handleSendReaction = (emoji: string) => {
+    playPopSound();
     const localId = `local-${Date.now()}-${Math.random()}`;
     setFloatingReactions((prev) => [
       ...prev.slice(-10),
@@ -1291,6 +1323,9 @@ export default function VideoPlayer({
   const handleToggleReady = () => {
     const next = !isReady;
     setIsReady(next);
+    if (next) playChimeSound();
+    else playPopSound();
+
     if (isConfigured && database) {
       set(ref(database, `rooms/${roomId}/lobby/participants/${userId}`), {
         nickname: nickname || 'Convidado',
@@ -1311,10 +1346,18 @@ export default function VideoPlayer({
         startedByName: nickname || 'Host'
       }).catch(() => {});
     } else {
+      playCountdownBeep(3);
       setCountdownStep('3');
-      window.setTimeout(() => setCountdownStep('2'), 1000);
-      window.setTimeout(() => setCountdownStep('1'), 2000);
       window.setTimeout(() => {
+        playCountdownBeep(2);
+        setCountdownStep('2');
+      }, 1000);
+      window.setTimeout(() => {
+        playCountdownBeep(1);
+        setCountdownStep('1');
+      }, 2000);
+      window.setTimeout(() => {
+        playActionChord();
         setCountdownStep('🍿 AÇÃO!');
         videoRef.current?.play().catch(() => {});
       }, 3000);
@@ -1322,10 +1365,10 @@ export default function VideoPlayer({
     }
   };
 
-  // Toggle room control mode (Host only)
-  const handleToggleControlMode = () => {
-    if (!isHost) return;
-    const nextMode: 'anyone' | 'host' = controlMode === 'anyone' ? 'host' : 'anyone';
+  // Set room control mode (Host only) with sound
+  const handleSetControlMode = (nextMode: 'anyone' | 'host') => {
+    if (!isHost || controlMode === nextMode) return;
+    playPopSound();
     setControlMode(nextMode);
     if (isConfigured && database) {
       if (!hostId) {
@@ -1339,6 +1382,8 @@ export default function VideoPlayer({
       });
     }
   };
+
+
 
   // Manual resync button for any participant
   const handleManualSync = () => {
@@ -1628,76 +1673,130 @@ export default function VideoPlayer({
   const progressPercent =
     localDuration > 0 ? Math.min(100, (localCurrentTime / localDuration) * 100) : 0;
 
-  // Reusable Permission + Lobby Ready Bar rendered at the top of the player
+  // Reusable Cinema Lounge & Presence Deck (21st.dev high-craft style)
   const renderPermissionAndLobbyBar = () => (
-    <div className="permission-bar glass">
-      <div className="permission-top-row">
-        <div className="permission-mode-group">
-          {controlMode === 'anyone' ? (
-            <span className="permission-pill collaborative">
-              <Users size={13} />
-              <span>Controle Livre (Todos)</span>
-            </span>
+    <div className="cinema-lounge-deck">
+      <div className="lounge-cockpit-top">
+        {/* Left: Mode Controller (Segmented pill for host, status pill for guest) */}
+        <div className="lounge-mode-cluster">
+          {isHost ? (
+            <div className="segmented-control-host" role="radiogroup" aria-label="Modo de Controle">
+              <button
+                type="button"
+                onClick={() => handleSetControlMode('anyone')}
+                className={`segmented-tab ${controlMode === 'anyone' ? 'active' : ''}`}
+                title="Modo Livre: qualquer pessoa na sala pode pausar, dar play e buscar"
+              >
+                <Users size={12} />
+                <span>Controle Livre</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleSetControlMode('host')}
+                className={`segmented-tab ${controlMode === 'host' ? 'active' : ''}`}
+                title="Modo Só Host: apenas você comanda a reprodução da sessão"
+              >
+                <Crown size={12} />
+                <span>Só Host</span>
+              </button>
+            </div>
           ) : (
-            <span className="permission-pill host-only">
-              <Shield size={13} />
-              <span>{isHost ? 'Modo Só Host (Você)' : 'Modo Só Host'}</span>
-            </span>
-          )}
-
-          {isHost && (
-            <button
-              type="button"
-              onClick={handleToggleControlMode}
-              className="btn-toggle-permission"
-              title="Alterar quem pode dar play, pause e trocar o vídeo nesta party"
-            >
-              {controlMode === 'anyone' ? '⇄ Mudar: Só Host' : '⇄ Mudar: Livre'}
-            </button>
+            <div className="guest-mode-status-pill">
+              {controlMode === 'anyone' ? (
+                <>
+                  <Users size={12} className="glyph-purple" />
+                  <span>Controle Livre (Todos)</span>
+                </>
+              ) : (
+                <>
+                  <Crown size={12} className="glyph-amber" />
+                  <span>Host no Comando</span>
+                </>
+              )}
+            </div>
           )}
         </div>
 
-        <div className="permission-actions">
+        {/* Right: Actions (Pipoca Pronta + Countdown) */}
+        <div className="lounge-actions-cluster">
           <button
             type="button"
             onClick={handleToggleReady}
-            className={`btn-ready-toggle ${isReady ? 'active' : ''}`}
-            title="Avise na sala que você já está pronto com a pipoca!"
+            className={`btn-cinema-ready ${isReady ? 'is-ready' : ''}`}
+            title="Sinalize para a sala se sua pipoca e refrigerante estão prontos!"
           >
-            <CheckCircle2 size={14} />
-            <span>{isReady ? 'Estou Pronto! ✅' : 'Marcar Pronto'}</span>
+            <span className="ready-glyph">🍿</span>
+            <span className="ready-text">{isReady ? 'Pipoca Pronta!' : 'Pegar Pipoca'}</span>
+            {isReady && <span className="ready-sparkle">✨</span>}
           </button>
 
           {canControl && videoInfo && (
             <button
               type="button"
               onClick={handleStartCountdown}
-              className="btn-countdown-start"
-              title="Disparar contagem 3, 2, 1 na tela de todos e iniciar o filme!"
+              className="btn-launch-countdown"
+              title="Disparar contagem cinematográfica 3, 2, 1 e dar play para todos ao mesmo tempo!"
             >
-              <Sparkles size={14} />
+              <Sparkles size={13} className="sparkle-beacon" />
               <span>3, 2, 1 Play!</span>
             </button>
           )}
         </div>
       </div>
 
-      {/* Online Participants & Ready Counter Row */}
+      {/* Online Audience Avatars Cluster */}
       {participantList.length > 0 && (
-        <div className="lobby-participants-row">
-          <span className="lobby-row-label">Na sala:</span>
-          <div className="lobby-participants-pills">
-            {participantList.map(([uid, p]) => (
-              <span key={uid} className={`participant-chip ${p.ready ? 'ready' : ''}`}>
-                <span className={`status-dot ${p.ready ? 'ready' : 'waiting'}`} />
-                <span>{p.nickname}</span>
-                {uid === userId && <span className="you-tag">(você)</span>}
-              </span>
-            ))}
+        <div className="lounge-audience-row">
+          <div className="audience-avatars-stack">
+            {participantList.map(([uid, p], index) => {
+              const isMe = uid === userId;
+              const cleanName = (p.nickname || 'Anônimo').replace(/[^a-zA-Z0-9\s]/g, '').trim();
+              const words = cleanName.split(/\s+/).filter(Boolean);
+              const initials =
+                words.length > 1
+                  ? (words[0][0] + words[1][0]).toUpperCase()
+                  : (cleanName.slice(0, 2) || 'P').toUpperCase();
+              const avatarGradients = [
+                'linear-gradient(135deg, #a855f7 0%, #ec4899 100%)',
+                'linear-gradient(135deg, #3b82f6 0%, #06b6d4 100%)',
+                'linear-gradient(135deg, #10b981 0%, #14b8a6 100%)',
+                'linear-gradient(135deg, #f59e0b 0%, #ef4444 100%)',
+                'linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%)'
+              ];
+              const gradient = avatarGradients[index % avatarGradients.length];
+
+              return (
+                <div
+                  key={uid}
+                  className={`audience-avatar-bubble ${p.ready ? 'ready' : ''} ${isMe ? 'is-me' : ''}`}
+                  title={`${p.nickname} ${isMe ? '(Você)' : ''} • ${p.ready ? '🍿 Pipoca Pronta!' : 'Aguardando'}`}
+                >
+                  <div className="avatar-disc" style={{ background: gradient }}>
+                    <span>{initials}</span>
+                  </div>
+                  {p.ready && (
+                    <span className="avatar-popcorn-tag" aria-label="Pipoca pronta">🍿</span>
+                  )}
+                  <span className={`avatar-status-beacon ${p.ready ? 'ready' : 'idle'}`} />
+                </div>
+              );
+            })}
           </div>
-          <span className="ready-count-tag">
-            {readyCount}/{participantList.length} prontos
-          </span>
+
+          <div className="audience-summary-meta">
+            <span className="summary-status-dot" />
+            <span className="summary-count-label">
+              <strong>{participantList.length}</strong> {participantList.length === 1 ? 'na sala' : 'na sala'}
+            </span>
+            <span className="summary-sep">•</span>
+            <span className="summary-ready-label">
+              {readyCount === 0
+                ? 'Ninguém pronto ainda'
+                : readyCount === participantList.length
+                ? 'Todos com a pipoca pronta! 🍿'
+                : `${readyCount}/${participantList.length} pronto(s)`}
+            </span>
+          </div>
         </div>
       )}
     </div>
@@ -1771,7 +1870,37 @@ export default function VideoPlayer({
                           onChange={(e) => setInputUrl(e.target.value)}
                           required
                         />
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            try {
+                              const text = await navigator.clipboard.readText();
+                              if (text) {
+                                playPopSound();
+                                setInputUrl(text.trim());
+                              }
+                            } catch {
+                              // ignore
+                            }
+                          }}
+                          className="btn-dock-paste"
+                          title="Colar link da área de transferência"
+                        >
+                          <ClipboardCopy size={12} />
+                          <span>Colar</span>
+                        </button>
                       </div>
+                      {inputUrl.trim() && (
+                        <div className="dock-detected-badge animate-fade-in">
+                          {getYouTubeId(inputUrl) ? (
+                            <span>🎥 YouTube detectado • Player IFrame Sincronizado</span>
+                          ) : getGoogleDriveId(inputUrl) ? (
+                            <span>☁️ Google Drive detectado • Stream de Alta Fidelidade</span>
+                          ) : (
+                            <span>⚡ Arquivo de Vídeo Web Direto (.mp4 / stream)</span>
+                          )}
+                        </div>
+                      )}
                       <button type="submit" className="btn-dock-action url">
                         <span>Carregar Vídeo</span>
                         <ArrowRight size={15} />
@@ -1917,6 +2046,24 @@ export default function VideoPlayer({
             )}
           </div>
         </div>
+
+        {/* Cinema Ambilight Aura Effect */}
+        <div
+          className={`cinema-ambilight-aura ${localIsPlaying ? 'is-playing' : 'is-idle'}`}
+          aria-hidden="true"
+        />
+
+        {theaterLightsOff && (
+          <button
+            type="button"
+            onClick={() => setTheaterLightsOff(false)}
+            className="theater-lights-banner animate-fade-in"
+            title="Clique para acender as luzes da sala"
+          >
+            <Lightbulb size={13} className="banner-glow-icon" />
+            <span>Modo Cinema Ativo • Toque para acender as luzes</span>
+          </button>
+        )}
 
         {/* Main viewport (Fullscreen target so custom HUD, subtitles, reactions & chat appear in Fullscreen!) */}
         <div
@@ -2278,6 +2425,22 @@ export default function VideoPlayer({
                     <Subtitles size={16} />
                   </button>
 
+                  <button
+                    type="button"
+                    onClick={() => {
+                      playPopSound();
+                      setTheaterLightsOff((prev) => !prev);
+                    }}
+                    className={`hud-icon-btn ${theaterLightsOff ? 'active-feature' : ''}`}
+                    title={
+                      theaterLightsOff
+                        ? 'Acender luzes da sala (sair do Modo Cinema)'
+                        : 'Apagar luzes da sala (Modo Cinema Imersivo)'
+                    }
+                  >
+                    <Lightbulb size={16} />
+                  </button>
+
                   <div className="hud-settings-wrapper">
                     <button
                       type="button"
@@ -2495,20 +2658,41 @@ export default function VideoPlayer({
             </span>
           </div>
 
-          <div className="reaction-bar">
-            <span className="reaction-bar-label">Reagir:</span>
-            <div className="reaction-buttons-group">
-              {REACTION_EMOJIS.map((emoji) => (
-                <button
-                  key={emoji}
-                  type="button"
-                  onClick={() => handleSendReaction(emoji)}
-                  className="btn-emoji-react"
-                  title={`Enviar ${emoji} na tela de todos`}
-                >
-                  {emoji}
-                </button>
-              ))}
+          <div className="footer-right-actions">
+            <button
+              type="button"
+              onClick={() => {
+                const next = !soundActive;
+                setSoundActive(next);
+                setSoundEnabled(next);
+                if (next) playPopSound();
+              }}
+              className={`btn-sound-toggle ${soundActive ? 'active' : ''}`}
+              title={
+                soundActive
+                  ? 'Efeitos sonoros ativados (pipoca, reações e contagem). Clique para silenciar.'
+                  : 'Efeitos sonoros desativados. Clique para ativar.'
+              }
+            >
+              {soundActive ? <Volume2 size={13} /> : <VolumeX size={13} />}
+              <span>{soundActive ? 'Sons ON' : 'Sons OFF'}</span>
+            </button>
+
+            <div className="reaction-bar">
+              <span className="reaction-bar-label">Reagir:</span>
+              <div className="reaction-buttons-group">
+                {REACTION_EMOJIS.map((emoji) => (
+                  <button
+                    key={emoji}
+                    type="button"
+                    onClick={() => handleSendReaction(emoji)}
+                    className="btn-emoji-react"
+                    title={`Enviar ${emoji} na tela de todos`}
+                  >
+                    {emoji}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
         </div>
