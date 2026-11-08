@@ -1,208 +1,530 @@
-/* Room Nickname Prompt styles */
+/* ==========================================================================
+   DUOCINE / WATCH2GETHER - ROOM STYLESHEET
+   Obsidian Studio Aesthetic (Zero Clipping, 21st.dev Level Polish)
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   1. Pre-Room Prompt Screens (Nickname & Private Room PIN Unlock)
+   -------------------------------------------------------------------------- */
 .room-prompt-container {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
   min-height: 100vh;
-  padding: 20px;
+  padding: 24px 16px;
+  overflow: hidden;
+  background-color: var(--bg-dark, #050508);
 }
 
-.room-prompt-card {
-  max-width: 440px;
+.studio-prompt-card {
+  position: relative;
+  z-index: 10;
+  max-width: 460px;
   width: 100%;
-  padding: 40px 30px;
-  border-radius: var(--radius-lg);
+  padding: 34px 30px;
+  border-radius: 20px;
+  background: linear-gradient(180deg, rgba(16, 16, 24, 0.94) 0%, rgba(9, 9, 15, 0.98) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  box-shadow:
+    0 24px 60px -12px rgba(0, 0, 0, 0.8),
+    0 0 0 1px rgba(255, 255, 255, 0.03),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
   display: flex;
   flex-direction: column;
   align-items: center;
   text-align: center;
   gap: 20px;
-  box-shadow: var(--shadow-lg);
+  animation: studioSlideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
-.room-id-highlight {
-  color: var(--color-purple);
-  font-family: var(--font-mono);
-  background: rgba(168, 85, 247, 0.1);
-  padding: 2px 8px;
-  border-radius: var(--radius-sm);
-  border: 1px solid rgba(168, 85, 247, 0.2);
+@keyframes studioSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
-.prompt-desc {
-  font-size: 0.95rem;
-  color: var(--text-secondary);
-  line-height: 1.5;
-}
-
-.prompt-form {
-  width: 100%;
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
-
-.back-link {
+.prompt-card-top-kicker {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  color: var(--text-muted);
-  font-size: 0.85rem;
+  font-family: var(--font-mono, monospace);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: #c084fc;
+  background: rgba(168, 85, 247, 0.12);
+  border: 1px solid rgba(168, 85, 247, 0.25);
+  padding: 3px 10px;
+  border-radius: 9999px;
+}
+
+.prompt-card-top-kicker.lock {
+  color: #fbbf24;
+  background: rgba(245, 158, 11, 0.12);
+  border-color: rgba(245, 158, 11, 0.25);
+}
+
+.kicker-glyph {
+  color: inherit;
+}
+
+.prompt-title-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.prompt-title-header h2 {
+  font-size: 1.4rem;
+  font-weight: 800;
+  letter-spacing: -0.025em;
+  color: #ffffff;
+  margin: 0;
+}
+
+.prompt-room-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.78rem;
+  font-family: var(--font-mono, monospace);
+  color: #d8b4fe;
+  background: rgba(168, 85, 247, 0.12);
+  border: 1px solid rgba(168, 85, 247, 0.24);
+  padding: 4px 11px;
+  border-radius: 9999px;
+}
+
+.room-beacon-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #a855f7;
+  box-shadow: 0 0 8px #a855f7;
+}
+
+.room-beacon-dot.lock {
+  background: #fbbf24;
+  box-shadow: 0 0 8px #fbbf24;
+}
+
+.room-title-extra {
+  font-family: var(--font-sans, sans-serif);
+  color: #a1a1aa;
+  font-weight: 500;
+  font-size: 0.74rem;
+}
+
+.prompt-desc {
+  font-size: 0.86rem;
+  color: #94a3b8;
+  line-height: 1.45;
+  margin: 0;
+  max-width: 360px;
+}
+
+.prompt-studio-form {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  text-align: left;
+}
+
+.pin-error-notice {
+  color: #f87171;
+  font-size: 0.78rem;
+  font-weight: 600;
+  margin-top: 6px;
+}
+
+.prompt-back-home-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #71717a;
+  font-size: 0.82rem;
+  font-weight: 500;
   text-decoration: none;
-  transition: color 0.2s ease;
+  transition: color 0.18s ease;
 }
 
-.back-link:hover {
-  color: var(--text-secondary);
+.prompt-back-home-link:hover {
+  color: #ffffff;
 }
 
-/* Full Room View styles */
+/* --------------------------------------------------------------------------
+   2. Full Room View - Layout & Header Bar
+   -------------------------------------------------------------------------- */
 .room-page-layout {
   display: flex;
   flex-direction: column;
-  height: 100vh;
-  overflow: hidden;
-  background: #060608;
+  min-height: 100vh;
+  width: 100%;
+  background: transparent;
 }
 
-.room-navbar {
-  height: 60px;
+.room-navbar.studio-header {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  min-height: 56px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 24px;
-  border-bottom: 1px solid var(--border-muted);
-  background: rgba(15, 15, 18, 0.6);
-  z-index: 10;
+  gap: 12px;
+  padding: 8px 20px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(8, 8, 12, 0.88);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
 }
 
 .nav-left {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 12px;
+  min-width: 0;
+  flex: 1;
 }
 
 .btn-back-home {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
-  border-radius: var(--radius-md);
-  border: 1px solid var(--border-muted);
-  background: rgba(255, 255, 255, 0.03);
-  color: var(--text-secondary);
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  background: rgba(255, 255, 255, 0.04);
+  color: #a1a1aa;
   cursor: pointer;
   transition: all 0.2s ease;
+  flex-shrink: 0;
+  text-decoration: none;
 }
 
 .btn-back-home:hover {
-  color: var(--text-primary);
-  background: rgba(255, 255, 255, 0.08);
-  border-color: var(--text-muted);
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.2);
 }
 
-.nav-logo {
+.nav-brand-cluster {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 9px;
+  min-width: 0;
 }
 
-.logo-text {
+.nav-logo-icon {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, rgba(168, 85, 247, 0.25) 0%, rgba(99, 102, 241, 0.25) 100%);
+  border: 1px solid rgba(168, 85, 247, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #c084fc;
+  flex-shrink: 0;
+}
+
+.nav-title-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.nav-brand-name {
   font-size: 0.95rem;
-  font-weight: 700;
+  font-weight: 800;
   letter-spacing: -0.02em;
+  color: #ffffff;
+  flex-shrink: 0;
+}
+
+.nav-session-title {
+  font-size: 0.84rem;
+  font-weight: 500;
+  color: #a1a1aa;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 200px;
+  padding-left: 6px;
+  border-left: 1px solid rgba(255, 255, 255, 0.12);
 }
 
 .nav-room-badge {
-  font-family: var(--font-mono);
-  font-size: 0.75rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--font-mono, monospace);
+  font-size: 0.72rem;
+  font-weight: 600;
   background: rgba(255, 255, 255, 0.05);
-  border: 1px solid var(--border-muted);
-  padding: 4px 8px;
-  border-radius: var(--radius-sm);
-  color: var(--text-secondary);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  padding: 4px 10px;
+  border-radius: 9999px;
+  color: #cbd5e1;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.badge-live-icon {
+  color: #a855f7;
+}
+
+.badge-lock-icon {
+  color: #fbbf24;
 }
 
 .nav-right {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
+  flex-shrink: 0;
 }
 
-.user-badge {
+/* --------------------------------------------------------------------------
+   3. Quick Share Group in Navbar
+   -------------------------------------------------------------------------- */
+.nav-share-group {
   display: flex;
   align-items: center;
-  gap: 8px;
-  background: rgba(168, 85, 247, 0.1);
-  border: 1px solid rgba(168, 85, 247, 0.2);
-  color: var(--color-purple);
-  padding: 6px 12px;
-  border-radius: var(--radius-md);
-  font-size: 0.8rem;
+  gap: 6px;
+}
+
+.btn-nav-share {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  height: 32px;
+  padding: 0 11px;
+  border-radius: 9999px;
+  font-size: 0.75rem;
   font-weight: 600;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  font-family: var(--font-sans, sans-serif);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* Primary "Compartilhar" Button */
+.btn-nav-share.share-main {
+  background: linear-gradient(135deg, rgba(168, 85, 247, 0.2) 0%, rgba(99, 102, 241, 0.22) 100%);
+  border-color: rgba(168, 85, 247, 0.4);
+  color: #f5d0fe;
+  box-shadow: 0 2px 10px rgba(168, 85, 247, 0.15);
+}
+
+.btn-nav-share.share-main:hover {
+  background: linear-gradient(135deg, rgba(168, 85, 247, 0.35) 0%, rgba(99, 102, 241, 0.38) 100%);
+  border-color: rgba(168, 85, 247, 0.6);
+  color: #ffffff;
+  transform: translateY(-1px);
+}
+
+/* Quick WhatsApp Pill */
+.btn-nav-share.whatsapp {
+  background: rgba(37, 211, 102, 0.12);
+  color: #34d399;
+  border-color: rgba(37, 211, 102, 0.28);
+}
+
+.btn-nav-share.whatsapp:hover {
+  background: rgba(37, 211, 102, 0.24);
+  color: #ffffff;
+  border-color: rgba(37, 211, 102, 0.5);
+  transform: translateY(-1px);
+}
+
+/* Quick Instagram Pill */
+.btn-nav-share.instagram {
+  background: rgba(236, 72, 153, 0.12);
+  color: #f472b6;
+  border-color: rgba(236, 72, 153, 0.28);
+}
+
+.btn-nav-share.instagram:hover {
+  background: rgba(236, 72, 153, 0.24);
+  color: #ffffff;
+  border-color: rgba(236, 72, 153, 0.5);
+  transform: translateY(-1px);
+}
+
+/* Quick Copy Link Pill */
+.btn-nav-share.copy {
+  background: rgba(255, 255, 255, 0.05);
+  color: #cbd5e1;
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.btn-nav-share.copy:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #ffffff;
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.btn-nav-share.copy.copied {
+  background: rgba(16, 185, 129, 0.18);
+  border-color: rgba(16, 185, 129, 0.45);
+  color: #34d399;
+}
+
+/* User Profile Badge */
+.user-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  color: #e2e8f0;
+  padding: 0 11px;
+  border-radius: 9999px;
+  font-size: 0.76rem;
+  font-weight: 600;
+  white-space: nowrap;
+  max-width: 140px;
+}
+
+.user-badge-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .demo-badge {
-  font-size: 0.7rem;
+  font-size: 0.68rem;
   font-weight: 800;
   background: rgba(245, 158, 11, 0.15);
   color: #fbbf24;
   border: 1px solid rgba(245, 158, 11, 0.3);
   padding: 2px 6px;
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-sm, 6px);
   letter-spacing: 0.05em;
+  white-space: nowrap;
 }
 
+/* --------------------------------------------------------------------------
+   4. Main Workspace Grid
+   -------------------------------------------------------------------------- */
 .room-workspace {
   flex: 1;
-  display: flex;
-  padding: 20px;
-  gap: 20px;
-  overflow: hidden;
-  height: calc(100vh - 60px);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 360px;
+  gap: 16px;
+  padding: 14px 20px 20px;
+  max-width: 1760px;
+  width: 100%;
+  margin: 0 auto;
+  align-items: stretch;
 }
 
 .video-area {
-  flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
-  justify-content: center;
-  height: 100%;
+  justify-content: flex-start;
 }
 
 .chat-area {
-  width: 380px;
-  height: 100%;
-  flex-shrink: 0;
+  width: 100%;
+  height: calc(100vh - 86px);
+  min-height: 360px;
+  max-height: 860px;
+  position: sticky;
+  top: 70px;
 }
 
-/* Responsiveness for tablets and mobiles */
-@media (max-width: 968px) {
-  .room-page-layout {
-    height: auto;
-    overflow-y: auto;
+.room-share-toast {
+  position: fixed;
+  top: 68px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 100;
+  padding: 10px 18px;
+  border-radius: 9999px;
+  background: rgba(15, 15, 22, 0.96);
+  border: 1px solid var(--color-purple, #a855f7);
+  color: #ffffff;
+  font-size: 0.82rem;
+  font-weight: 600;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+  white-space: nowrap;
+}
+
+/* --------------------------------------------------------------------------
+   5. Tablet & Mobile Responsive
+   -------------------------------------------------------------------------- */
+@media (max-width: 1024px) {
+  .room-workspace {
+    grid-template-columns: 1fr;
+    padding: 12px;
+    gap: 14px;
   }
-  
-  .room-navbar {
-    padding: 0 16px;
+
+  .chat-area {
+    position: static;
+    height: 440px;
+    min-height: 380px;
+  }
+}
+
+@media (max-width: 768px) {
+  .room-navbar.studio-header {
+    padding: 8px 12px;
+    gap: 8px;
+  }
+
+  .nav-session-title {
+    display: none;
+  }
+
+  .hide-mobile {
+    display: none !important;
+  }
+
+  .user-badge {
+    max-width: 100px;
+  }
+}
+
+@media (max-width: 500px) {
+  .nav-brand-name {
+    display: none;
+  }
+
+  .user-badge {
+    display: none;
+  }
+
+  .nav-room-badge {
+    font-size: 0.68rem;
+    padding: 3px 8px;
+  }
+
+  .btn-nav-share {
+    height: 30px;
+    padding: 0 10px;
+    font-size: 0.72rem;
   }
 
   .room-workspace {
-    flex-direction: column;
-    height: auto;
-    overflow: visible;
-    padding: 12px;
-    gap: 16px;
-  }
-  
-  .video-area {
-    width: 100%;
-    height: auto;
-  }
-  
-  .chat-area {
-    width: 100%;
-    height: 500px;
+    padding: 10px 8px;
+    gap: 12px;
   }
 }

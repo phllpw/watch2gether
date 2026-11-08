@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Send, Copy, Check, Users, AlertTriangle } from 'lucide-react';
+import { Send, Copy, Check, MessageSquare, AlertTriangle } from 'lucide-react';
 import { database, isConfigured } from '../firebase';
 import { ref, push, onValue, serverTimestamp } from 'firebase/database';
 import './Chat.css';
@@ -14,18 +14,19 @@ interface Message {
 interface ChatProps {
   roomId: string;
   nickname: string;
+  roomTitle?: string;
+  roomPin?: string;
 }
 
 export default function Chat({ roomId, nickname }: ChatProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState('');
   const [copied, setCopied] = useState(false);
-  const chatEndRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
 
   // Load and listen to messages
   useEffect(() => {
     if (!isConfigured || !database) {
-      // Demo Mode initial messages
       setMessages([
         {
           id: 'welcome-1',
@@ -51,8 +52,7 @@ export default function Chat({ roomId, nickname }: ChatProps) {
           id: key,
           ...data[key]
         })) as Message[];
-        
-        // Sort messages by timestamp
+
         messageList.sort((a, b) => a.timestamp - b.timestamp);
         setMessages(messageList);
       } else {
@@ -63,10 +63,14 @@ export default function Chat({ roomId, nickname }: ChatProps) {
     return () => unsubscribe();
   }, [roomId]);
 
-  // Scroll to bottom on new messages
+  // Scroll internal chat container to bottom on new messages (NEVER scroll window!)
   useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    const el = messagesContainerRef.current;
+    if (el) {
+      el.scrollTop = el.scrollHeight;
+    }
   }, [messages]);
+
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -85,31 +89,29 @@ export default function Chat({ roomId, nickname }: ChatProps) {
         const chatRef = ref(database, `rooms/${roomId}/chat`);
         await push(chatRef, messageData);
       } catch (error) {
-        console.error("Erro ao enviar mensagem:", error);
+        console.error('Erro ao enviar mensagem:', error);
       }
     } else {
-      // Local Demo append
       const localMsg: Message = {
         id: `local-${Date.now()}`,
         sender: nickname,
         text: messageData.text,
         timestamp: messageData.timestamp as number
       };
-      
+
       setMessages((prev) => [...prev, localMsg]);
 
-      // Simple mock automatic response
       setTimeout(() => {
         setMessages((prev) => [
           ...prev,
           {
             id: `reply-${Date.now()}`,
             sender: 'Amigo Virtual (Demo)',
-            text: `Recebido! Sincronização offline funcionando para: "${messageData.text}"`,
+            text: `Recebido! Sincronização funcionando para: "${messageData.text}"`,
             timestamp: Date.now()
           }
         ]);
-      }, 1500);
+      }, 1200);
     }
   };
 
@@ -124,20 +126,23 @@ export default function Chat({ roomId, nickname }: ChatProps) {
   return (
     <div className="chat-container glass">
       {/* Chat Header */}
-      <div className="chat-header border-b">
+      <div className="chat-header">
         <div className="chat-info">
-          <Users size={18} className="chat-header-icon" />
-          <div>
-            <h3>Chat: {nickname}</h3>
-            <span className="room-code-tag">ID: {roomId}</span>
+          <div className="chat-icon-box">
+            <MessageSquare size={16} className="chat-header-icon" />
+          </div>
+          <div className="chat-title-meta">
+            <h3>Chat ao Vivo</h3>
+            <span className="room-code-tag">Você: {nickname}</span>
           </div>
         </div>
-        <button 
-          onClick={copyRoomLink} 
+        <button
+          type="button"
+          onClick={copyRoomLink}
           className={`btn-icon-copy ${copied ? 'copied' : ''}`}
           title="Copiar Link de Convite"
         >
-          {copied ? <Check size={16} /> : <Copy size={16} />}
+          {copied ? <Check size={14} /> : <Copy size={14} />}
           <span>{copied ? 'Copiado!' : 'Convidar'}</span>
         </button>
       </div>
@@ -146,41 +151,50 @@ export default function Chat({ roomId, nickname }: ChatProps) {
       {!isConfigured && (
         <div className="chat-demo-alert">
           <AlertTriangle size={14} />
-          <span>Modo Demo: mensagens não serão sincronizadas.</span>
+          <span>Modo Demo: mensagens locais.</span>
         </div>
       )}
 
       {/* Messages list */}
-      <div className="chat-messages">
-        {messages.map((msg) => {
-          const isMe = msg.sender === nickname;
-          const isSystem = msg.sender === 'Sistema';
-          
-          let bubbleClass = 'msg-bubble';
-          if (isSystem) bubbleClass += ' system';
-          else if (isMe) bubbleClass += ' me';
-          else bubbleClass += ' other';
+      <div ref={messagesContainerRef} className="chat-messages">
+        {messages.length === 0 ? (
+          <div className="chat-empty-placeholder">
+            <MessageSquare size={24} />
+            <p>Nenhuma mensagem ainda. Mande um "Oi" para começar a sessão! 🍿</p>
+          </div>
+        ) : (
+          messages.map((msg) => {
+            const isMe = msg.sender === nickname;
+            const isSystem = msg.sender === 'Sistema';
 
-          return (
-            <div 
-              key={msg.id} 
-              className={`message-wrapper ${isSystem ? 'system' : isMe ? 'me' : 'other'}`}
-            >
-              {!isSystem && <span className="msg-sender">{msg.sender}</span>}
-              <div className={bubbleClass}>
-                <p className="msg-text">{msg.text}</p>
-                <span className="msg-time">
-                  {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                </span>
+            let bubbleClass = 'msg-bubble';
+            if (isSystem) bubbleClass += ' system';
+            else if (isMe) bubbleClass += ' me';
+            else bubbleClass += ' other';
+
+            return (
+              <div
+                key={msg.id}
+                className={`message-wrapper ${isSystem ? 'system' : isMe ? 'me' : 'other'}`}
+              >
+                {!isSystem && <span className="msg-sender">{msg.sender}</span>}
+                <div className={bubbleClass}>
+                  <p className="msg-text">{msg.text}</p>
+                  <span className="msg-time">
+                    {new Date(msg.timestamp).toLocaleTimeString([], {
+                      hour: '2-digit',
+                      minute: '2-digit'
+                    })}
+                  </span>
+                </div>
               </div>
-            </div>
-          );
-        })}
-        <div ref={chatEndRef} />
+            );
+          })
+        )}
       </div>
 
       {/* Input area */}
-      <form onSubmit={handleSendMessage} className="chat-input-area border-t">
+      <form onSubmit={handleSendMessage} className="chat-input-area">
         <input
           type="text"
           value={inputText}
