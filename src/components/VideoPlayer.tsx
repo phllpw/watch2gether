@@ -15,7 +15,6 @@ import {
   Settings,
   Subtitles,
   MessageSquare,
-  MessageSquareOff,
   CheckCircle2,
   Sparkles,
   RotateCcw,
@@ -28,7 +27,9 @@ import {
   Crown,
   ClipboardCopy,
   Lightbulb,
-  Smile
+  Smile,
+  Send,
+  X
 } from 'lucide-react';
 import { database, isConfigured, auth, clientUserId } from '../firebase';
 import { ref, onValue, set, push, onDisconnect } from 'firebase/database';
@@ -214,6 +215,14 @@ export default function VideoPlayer({
   });
   const [screenChatToasts, setScreenChatToasts] = useState<ScreenChatToast[]>([]);
 
+  // In-Player Fullscreen Live Chat Drawer (permite conversar no player sem sair da tela cheia)
+  const [isFullscreenChatOpen, setIsFullscreenChatOpen] = useState(false);
+  const [fullscreenChatMessages, setFullscreenChatMessages] = useState<
+    Array<{ id: string; sender: string; text: string; timestamp: number }>
+  >([]);
+  const [fullscreenInputText, setFullscreenInputText] = useState('');
+  const chatDrawerScrollRef = useRef<HTMLDivElement>(null);
+
   // Floating Reactions State & Toggle (user can disable floating reactions)
   const [showReactionsOnScreen, setShowReactionsOnScreen] = useState<boolean>(() => {
     const saved = localStorage.getItem('watchparty_reactions_overlay');
@@ -251,7 +260,6 @@ export default function VideoPlayer({
   const ytPlayerRef = useRef<any>(null);
   const ytContainerRef = useRef<HTMLDivElement>(null);
   const seenChatIdsRef = useRef<Set<string>>(new Set());
-  const chatInitializedRef = useRef<boolean>(false);
   const lastCountdownRef = useRef<number>(0);
 
   // Flag to avoid infinite sync feedback loops when applying remote state
@@ -341,7 +349,7 @@ export default function VideoPlayer({
       if (
         target &&
         target.closest(
-          'button, input, a, .screen-chat-toast, .hud-controls-row, .hud-progress-track, .paused-status-pill, .btn-exit-fullscreen-floating'
+          'button, input, a, .screen-chat-toast, .hud-controls-row, .hud-progress-track, .paused-status-pill, .btn-exit-fullscreen-floating, .fullscreen-chat-drawer'
         )
       ) {
         return;
@@ -775,45 +783,11 @@ export default function VideoPlayer({
       }, 3400);
     });
 
-    // Listen for new chat messages to display at the bottom of the video screen (especially in Fullscreen!)
-    const chatRef = ref(database, `rooms/${roomId}/chat`);
-    const unsubChat = onValue(chatRef, (snap) => {
-      const data = snap.val();
-      if (!data) {
-        chatInitializedRef.current = true;
-        return;
-      }
-      const keys = Object.keys(data);
-      if (!chatInitializedRef.current) {
-        keys.forEach((k) => seenChatIdsRef.current.add(k));
-        chatInitializedRef.current = true;
-        return;
-      }
-
-      keys.forEach((k) => {
-        if (!seenChatIdsRef.current.has(k)) {
-          seenChatIdsRef.current.add(k);
-          const msg = data[k];
-          if (msg && msg.text) {
-            const toastId = k;
-            setScreenChatToasts((prev) => [
-              ...prev.slice(-2),
-              { id: toastId, sender: msg.sender || 'Convidado', text: msg.text }
-            ]);
-            window.setTimeout(() => {
-              setScreenChatToasts((prev) => prev.filter((t) => t.id !== toastId));
-            }, 5500);
-          }
-        }
-      });
-    });
-
     return () => {
       unsubParticipants();
       unsubCountdown();
       unsubSubtitle();
       unsubReactions();
-      unsubChat();
     };
   }, [
     roomId,
@@ -824,6 +798,65 @@ export default function VideoPlayer({
     getServerNow,
     sendPlaybackPayload
   ]);
+
+  // 2C. Dedicated Room Chat Listener (powers In-Player Live Chat Drawer & Floating Stream Toasts)
+  useEffect(() => {
+    if (!isConfigured || !database || !roomId) return;
+    const chatRef = ref(database, `rooms/${roomId}/chat`);
+    let isInitialLoad = true;
+
+    const unsubChat = onValue(chatRef, (snapshot) => {
+      const data = snapshot.val();
+      if (!data) {
+        setFullscreenChatMessages([]);
+        return;
+      }
+
+      const list = Object.keys(data)
+        .map((key) => ({
+          id: key,
+          sender: data[key].sender || 'Convidado',
+          text: data[key].text || '',
+          timestamp: data[key].timestamp || 0
+        }))
+        .sort((a, b) => a.timestamp - b.timestamp);
+
+      setFullscreenChatMessages(list);
+
+      // On initial load, mark all existing messages as seen
+      if (isInitialLoad) {
+        list.forEach((m) => seenChatIdsRef.current.add(m.id));
+        isInitialLoad = false;
+        return;
+      }
+
+      // Check for new incoming messages and trigger toasts
+      list.forEach((m) => {
+        if (!seenChatIdsRef.current.has(m.id)) {
+          seenChatIdsRef.current.add(m.id);
+          if (m.text) {
+            const toastId = m.id;
+            setScreenChatToasts((prev) => [
+              ...prev.slice(-2),
+              { id: toastId, sender: m.sender, text: m.text }
+            ]);
+            window.setTimeout(() => {
+              setScreenChatToasts((prev) => prev.filter((t) => t.id !== toastId));
+            }, 6500);
+          }
+        }
+      });
+    });
+
+    return () => unsubChat();
+  }, [roomId]);
+
+  // Auto-scroll chat drawer to bottom on new messages
+  useEffect(() => {
+    if (isFullscreenChatOpen && chatDrawerScrollRef.current) {
+      chatDrawerScrollRef.current.scrollTop = chatDrawerScrollRef.current.scrollHeight;
+    }
+  }, [isFullscreenChatOpen, fullscreenChatMessages]);
 
   // 3. Initialize / Manage YouTube IFrame Player when source === 'youtube'
   useEffect(() => {
@@ -1438,6 +1471,37 @@ export default function VideoPlayer({
       push(ref(database, `rooms/${roomId}/reactions`), {
         emoji,
         sender: nickname || 'Convidado',
+        timestamp: Date.now()
+      }).catch(() => {});
+    }
+  };
+
+  const handleSendFullscreenChat = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const text = fullscreenInputText.trim();
+    if (!text) return;
+    playPopSound();
+    setFullscreenInputText('');
+    if (isConfigured && database) {
+      push(ref(database, `rooms/${roomId}/chat`), {
+        sender: nickname || 'Convidado',
+        text,
+        timestamp: Date.now()
+      }).catch((err) => console.error('Error sending fullscreen chat:', err));
+    }
+  };
+
+  const handleQuickSendFullscreenEmoji = (emoji: string) => {
+    playPopSound();
+    if (isConfigured && database) {
+      push(ref(database, `rooms/${roomId}/reactions`), {
+        emoji,
+        sender: nickname || 'Convidado',
+        timestamp: Date.now()
+      }).catch(() => {});
+      push(ref(database, `rooms/${roomId}/chat`), {
+        sender: nickname || 'Convidado',
+        text: emoji,
         timestamp: Date.now()
       }).catch(() => {});
     }
@@ -2353,33 +2417,113 @@ export default function VideoPlayer({
             </div>
           )}
 
-          {/* Bottom Chat Notification Overlay (works in Fullscreen on iOS, Android & PC!) */}
-          {showChatOnScreen && screenChatToasts.length > 0 && (
+          {/* Floating Live Chat Notifications (Stream/Twitch style, never hidden, never blocked!) */}
+          {showChatOnScreen && !isFullscreenChatOpen && screenChatToasts.length > 0 && (
             <div
               className={`screen-chat-toast-stack ${
                 hudVisible || !localIsPlaying ? 'hud-visible' : 'hud-hidden'
               }`}
             >
               {screenChatToasts.map((t) => (
-                <div key={t.id} className="screen-chat-toast">
+                <div
+                  key={t.id}
+                  className="screen-chat-toast"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setIsFullscreenChatOpen(true);
+                  }}
+                  title="Toque para responder no chat ao vivo"
+                >
                   <div className="screen-chat-content">
                     <span className="screen-chat-sender">💬 {t.sender}:</span>
                     <span className="screen-chat-text">{t.text}</span>
                   </div>
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleToggleChatOnScreen();
-                    }}
-                    className="btn-mute-screen-chat"
-                    title="Desativar notificações do chat na tela do vídeo"
-                  >
-                    <MessageSquareOff size={12} />
-                    <span>Ocultar</span>
-                  </button>
+                  <span className="toast-reply-badge">Responder</span>
                 </div>
               ))}
+            </div>
+          )}
+
+          {/* In-Player Live Chat Drawer (Chat directly on screen without leaving Fullscreen!) */}
+          {isFullscreenChatOpen && (
+            <div
+              className="fullscreen-chat-drawer animate-fade-in"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="drawer-header">
+                <div className="drawer-title-cluster">
+                  <MessageSquare size={15} className="drawer-icon-purple" />
+                  <span className="drawer-title">Chat da Sessão</span>
+                  <span className="drawer-count-tag">{fullscreenChatMessages.length}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsFullscreenChatOpen(false)}
+                  className="drawer-close-btn"
+                  title="Fechar Chat na Tela"
+                >
+                  <X size={15} />
+                </button>
+              </div>
+
+              {/* Messages Body */}
+              <div className="drawer-messages-list" ref={chatDrawerScrollRef}>
+                {fullscreenChatMessages.length === 0 ? (
+                  <div className="drawer-empty-state">
+                    <span>Nenhuma mensagem ainda. Envie um oi! 👋</span>
+                  </div>
+                ) : (
+                  fullscreenChatMessages.map((m) => {
+                    const isMe = m.sender === nickname;
+                    return (
+                      <div
+                        key={m.id}
+                        className={`drawer-msg-row ${isMe ? 'is-me' : 'is-other'}`}
+                      >
+                        <div className="drawer-msg-bubble">
+                          <span className="drawer-msg-sender">{m.sender}</span>
+                          <span className="drawer-msg-text">{m.text}</span>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+
+              {/* Quick Emojis Strip */}
+              <div className="drawer-quick-emojis">
+                {['🍿', '❤️', '😂', '🔥', '😱', '👏'].map((em) => (
+                  <button
+                    key={em}
+                    type="button"
+                    onClick={() => handleQuickSendFullscreenEmoji(em)}
+                    className="drawer-emoji-chip"
+                    title={`Enviar ${em}`}
+                  >
+                    {em}
+                  </button>
+                ))}
+              </div>
+
+              {/* Chat Input Bar */}
+              <form onSubmit={handleSendFullscreenChat} className="drawer-input-form">
+                <input
+                  type="text"
+                  className="drawer-input-field"
+                  placeholder="Mensagem..."
+                  value={fullscreenInputText}
+                  onChange={(e) => setFullscreenInputText(e.target.value)}
+                  maxLength={200}
+                />
+                <button
+                  type="submit"
+                  className="drawer-send-btn"
+                  disabled={!fullscreenInputText.trim()}
+                  title="Enviar mensagem"
+                >
+                  <Send size={14} />
+                </button>
+              </form>
             </div>
           )}
 
@@ -2509,19 +2653,16 @@ export default function VideoPlayer({
                 <div className="hud-right-group">
                   <button
                     type="button"
-                    onClick={handleToggleChatOnScreen}
-                    className={`hud-icon-btn ${showChatOnScreen ? 'active-feature' : ''}`}
+                    onClick={() => setIsFullscreenChatOpen((prev) => !prev)}
+                    className={`hud-icon-btn ${isFullscreenChatOpen ? 'active-feature' : ''}`}
                     title={
-                      showChatOnScreen
-                        ? 'Chat na tela ativado (aparece embaixo em Tela Cheia). Clique para desativar.'
-                        : 'Chat na tela desativado. Clique para mostrar mensagens em Tela Cheia.'
+                      isFullscreenChatOpen
+                        ? 'Fechar chat na tela'
+                        : 'Abrir chat na tela para conversar sem sair do vídeo'
                     }
                   >
-                    {showChatOnScreen ? (
-                      <MessageSquare size={15} />
-                    ) : (
-                      <MessageSquareOff size={15} />
-                    )}
+                    <MessageSquare size={15} />
+                    {screenChatToasts.length > 0 && <span className="hud-chat-badge-dot" />}
                   </button>
 
                   <button
