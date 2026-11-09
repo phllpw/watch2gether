@@ -27,7 +27,8 @@ import {
   ArrowRight,
   Crown,
   ClipboardCopy,
-  Lightbulb
+  Lightbulb,
+  Smile
 } from 'lucide-react';
 import { database, isConfigured, auth, clientUserId } from '../firebase';
 import { ref, onValue, set, push, onDisconnect } from 'firebase/database';
@@ -42,7 +43,6 @@ import {
 import { parseSubtitles, formatDuration, type SubtitleCue } from '../lib/subtitles';
 import {
   playPopSound,
-  playChimeSound,
   playCountdownBeep,
   playActionChord,
   isSoundEnabled,
@@ -214,12 +214,15 @@ export default function VideoPlayer({
   });
   const [screenChatToasts, setScreenChatToasts] = useState<ScreenChatToast[]>([]);
 
-  // Floating Reactions State
+  // Floating Reactions State & Toggle (user can disable floating reactions)
+  const [showReactionsOnScreen, setShowReactionsOnScreen] = useState<boolean>(() => {
+    const saved = localStorage.getItem('watchparty_reactions_overlay');
+    return saved !== null ? saved === 'true' : true;
+  });
   const [floatingReactions, setFloatingReactions] = useState<FloatingReaction[]>([]);
 
-  // Lobby Ready & Countdown State
+  // Lobby & Countdown State
   const [participants, setParticipants] = useState<Record<string, LobbyParticipant>>({});
-  const [isReady, setIsReady] = useState<boolean>(false);
   const [countdownStep, setCountdownStep] = useState<string | null>(null);
   const [theaterLightsOff, setTheaterLightsOff] = useState<boolean>(false);
   const [soundActive, setSoundActive] = useState<boolean>(() => isSoundEnabled());
@@ -677,7 +680,7 @@ export default function VideoPlayer({
     const myParticipantRef = ref(database, `rooms/${roomId}/lobby/participants/${userId}`);
     set(myParticipantRef, {
       nickname: nickname || 'Convidado',
-      ready: isReady,
+      ready: true,
       isHost,
       updatedAt: Date.now()
     }).catch(() => {});
@@ -816,7 +819,6 @@ export default function VideoPlayer({
     roomId,
     userId,
     nickname,
-    isReady,
     isHost,
     videoInfo?.source,
     getServerNow,
@@ -1268,14 +1270,27 @@ export default function VideoPlayer({
     }
   };
 
+  const isIos = useMemo(() => {
+    return (
+      typeof navigator !== 'undefined' &&
+      (/iPad|iPhone|iPod/.test(navigator.userAgent) ||
+        (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1))
+    );
+  }, []);
+
+  const handleAppleNativeFullscreen = useCallback(() => {
+    if (videoRef.current && (videoRef.current as any).webkitEnterFullscreen) {
+      try {
+        (videoRef.current as any).webkitEnterFullscreen();
+      } catch (err) {
+        console.warn('Native webkitEnterFullscreen error:', err);
+      }
+    }
+  }, []);
+
   const handleToggleFullscreen = () => {
     const container = viewportRef.current;
     if (!container) return;
-
-    const isIos =
-      typeof navigator !== 'undefined' &&
-      (/iPad|iPhone|iPod/.test(navigator.userAgent) ||
-        (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1));
 
     if (effectiveFullscreen) {
       if (isCssFullscreen) {
@@ -1307,6 +1322,10 @@ export default function VideoPlayer({
         } catch {
           // ignore
         }
+        // Hint mobile Safari / Chrome to collapse navigation bar
+        setTimeout(() => {
+          window.scrollTo(0, 1);
+        }, 150);
       } else {
         container
           .requestFullscreen()
@@ -1393,6 +1412,12 @@ export default function VideoPlayer({
     localStorage.setItem('watchparty_chat_overlay', String(next));
   };
 
+  const handleToggleReactionsOnScreen = () => {
+    const next = !showReactionsOnScreen;
+    setShowReactionsOnScreen(next);
+    localStorage.setItem('watchparty_reactions_overlay', String(next));
+  };
+
   const handleSendReaction = (emoji: string) => {
     playPopSound();
     const localId = `local-${Date.now()}-${Math.random()}`;
@@ -1414,22 +1439,6 @@ export default function VideoPlayer({
         emoji,
         sender: nickname || 'Convidado',
         timestamp: Date.now()
-      }).catch(() => {});
-    }
-  };
-
-  const handleToggleReady = () => {
-    const next = !isReady;
-    setIsReady(next);
-    if (next) playChimeSound();
-    else playPopSound();
-
-    if (isConfigured && database) {
-      set(ref(database, `rooms/${roomId}/lobby/participants/${userId}`), {
-        nickname: nickname || 'Convidado',
-        ready: next,
-        isHost,
-        updatedAt: Date.now()
       }).catch(() => {});
     }
   };
@@ -1766,7 +1775,6 @@ export default function VideoPlayer({
     return Array.from(byName.values());
   }, [participants, userId]);
 
-  const readyCount = participantList.filter(([, p]) => p.ready).length;
   const remainingTime = Math.max(0, (localDuration || 0) - localCurrentTime);
   const progressPercent =
     localDuration > 0 ? Math.min(100, (localCurrentTime / localDuration) * 100) : 0;
@@ -1815,19 +1823,8 @@ export default function VideoPlayer({
           )}
         </div>
 
-        {/* Right: Actions (Pipoca Pronta + Countdown) */}
+        {/* Right: Actions (Countdown) */}
         <div className="lounge-actions-cluster">
-          <button
-            type="button"
-            onClick={handleToggleReady}
-            className={`btn-cinema-ready ${isReady ? 'is-ready' : ''}`}
-            title="Sinalize para a sala se sua pipoca e refrigerante estão prontos!"
-          >
-            <span className="ready-glyph">🍿</span>
-            <span className="ready-text">{isReady ? 'Pipoca Pronta!' : 'Pegar Pipoca'}</span>
-            {isReady && <span className="ready-sparkle">✨</span>}
-          </button>
-
           {canControl && videoInfo && (
             <button
               type="button"
@@ -1866,16 +1863,13 @@ export default function VideoPlayer({
               return (
                 <div
                   key={uid}
-                  className={`audience-avatar-bubble ${p.ready ? 'ready' : ''} ${isMe ? 'is-me' : ''}`}
-                  title={`${p.nickname} ${isMe ? '(Você)' : ''} • ${p.ready ? '🍿 Pipoca Pronta!' : 'Aguardando'}`}
+                  className={`audience-avatar-bubble ${isMe ? 'is-me' : ''}`}
+                  title={`${p.nickname} ${isMe ? '(Você)' : ''}`}
                 >
                   <div className="avatar-disc" style={{ background: gradient }}>
                     <span>{initials}</span>
                   </div>
-                  {p.ready && (
-                    <span className="avatar-popcorn-tag" aria-label="Pipoca pronta">🍿</span>
-                  )}
-                  <span className={`avatar-status-beacon ${p.ready ? 'ready' : 'idle'}`} />
+                  <span className="avatar-status-beacon ready" />
                 </div>
               );
             })}
@@ -1884,15 +1878,12 @@ export default function VideoPlayer({
           <div className="audience-summary-meta">
             <span className="summary-status-dot" />
             <span className="summary-count-label">
-              <strong>{participantList.length}</strong> {participantList.length === 1 ? 'na sala' : 'na sala'}
+              <strong>{participantList.length}</strong>{' '}
+              {participantList.length === 1 ? 'conectado agora' : 'conectados agora'}
             </span>
             <span className="summary-sep">•</span>
             <span className="summary-ready-label">
-              {readyCount === 0
-                ? 'Ninguém pronto ainda'
-                : readyCount === participantList.length
-                ? 'Todos com a pipoca pronta! 🍿'
-                : `${readyCount}/${participantList.length} pronto(s)`}
+              {controlMode === 'anyone' ? 'Controle Livre' : 'Host no comando'}
             </span>
           </div>
         </div>
@@ -2346,19 +2337,21 @@ export default function VideoPlayer({
             </div>
           )}
 
-          {/* Floating Live Reactions Overlay */}
-          <div className="floating-reactions-layer">
-            {floatingReactions.map((r) => (
-              <div
-                key={r.id}
-                className="floating-reaction-bubble"
-                style={{ left: `${r.leftPercent}%` }}
-              >
-                <span className="reaction-emoji">{r.emoji}</span>
-                <span className="reaction-sender">{r.sender}</span>
-              </div>
-            ))}
-          </div>
+          {/* Floating Live Reactions Overlay (conditional on user preference) */}
+          {showReactionsOnScreen && (
+            <div className="floating-reactions-layer">
+              {floatingReactions.map((r) => (
+                <div
+                  key={r.id}
+                  className="floating-reaction-bubble"
+                  style={{ left: `${r.leftPercent}%` }}
+                >
+                  <span className="reaction-emoji">{r.emoji}</span>
+                  <span className="reaction-sender">{r.sender}</span>
+                </div>
+              ))}
+            </div>
+          )}
 
           {/* Bottom Chat Notification Overlay (works in Fullscreen on iOS, Android & PC!) */}
           {showChatOnScreen && screenChatToasts.length > 0 && (
@@ -2512,7 +2505,7 @@ export default function VideoPlayer({
                   </div>
                 </div>
 
-                {/* Right Side: Chat Overlay Toggle, Subtitles, Settings/Quality, PiP, Fullscreen */}
+                {/* Right Side: Chat Overlay Toggle, Emoji Overlay Toggle, Subtitles, Settings/Quality, PiP, Fullscreen */}
                 <div className="hud-right-group">
                   <button
                     type="button"
@@ -2529,6 +2522,19 @@ export default function VideoPlayer({
                     ) : (
                       <MessageSquareOff size={15} />
                     )}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleToggleReactionsOnScreen}
+                    className={`hud-icon-btn ${showReactionsOnScreen ? 'active-feature' : ''}`}
+                    title={
+                      showReactionsOnScreen
+                        ? 'Emojis na tela ativados. Clique para desativar.'
+                        : 'Emojis na tela desativados. Clique para ativar.'
+                    }
+                  >
+                    <Smile size={15} style={{ opacity: showReactionsOnScreen ? 1 : 0.4 }} />
                   </button>
 
                   <button
@@ -2735,9 +2741,46 @@ export default function VideoPlayer({
                           >
                             {showChatOnScreen
                               ? '✅ Mostrar mensagens na tela'
-                              : '🔕 Não mostrar mensagens na tela'}
+                              : '🔕 Ocultar mensagens na tela'}
                           </button>
                         </div>
+
+                        <div className="settings-section">
+                          <span className="settings-label">✨ Reações e Emojis na Tela</span>
+                          <button
+                            type="button"
+                            onClick={handleToggleReactionsOnScreen}
+                            className={`settings-chip w-full ${showReactionsOnScreen ? 'active' : ''}`}
+                          >
+                            {showReactionsOnScreen
+                              ? '✅ Mostrar emojis na tela'
+                              : '🚫 Ocultar emojis na tela'}
+                          </button>
+                        </div>
+
+                        {isIos && videoRef.current && (
+                          <div className="settings-section">
+                            <span className="settings-label">📱 Tela Cheia no iOS / iPhone</span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setShowSettingsMenu(false);
+                                handleAppleNativeFullscreen();
+                              }}
+                              className="settings-chip w-full"
+                              style={{
+                                background: 'linear-gradient(135deg, rgba(168, 85, 247, 0.2), rgba(59, 130, 246, 0.2))',
+                                borderColor: 'rgba(168, 85, 247, 0.4)',
+                                color: '#fff'
+                              }}
+                            >
+                              🎬 Player Nativo Apple (Zero Barra de URL)
+                            </button>
+                            <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginTop: '4px', display: 'block', lineHeight: 1.3 }}>
+                              💡 Dica: para tela cheia total sem barra também com chat e legendas, adicione o site à Tela de Início (PWA).
+                            </span>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
@@ -2822,6 +2865,18 @@ export default function VideoPlayer({
                   </button>
                 ))}
               </div>
+              <button
+                type="button"
+                onClick={handleToggleReactionsOnScreen}
+                className={`btn-reaction-toggle ${!showReactionsOnScreen ? 'muted' : ''}`}
+                title={
+                  showReactionsOnScreen
+                    ? 'Ocultar emojis flutuantes na sua tela'
+                    : 'Exibir emojis flutuantes na sua tela'
+                }
+              >
+                {showReactionsOnScreen ? 'Emojis ON' : 'Emojis OFF'}
+              </button>
             </div>
           </div>
         </div>

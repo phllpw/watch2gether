@@ -1732,6 +1732,34 @@ body.cinema-viewport-fullscreen-active .custom-cinema-hud {
   border-color: var(--color-purple);
 }
 
+.btn-reaction-toggle {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-muted);
+  border-radius: var(--radius-sm);
+  padding: 4px 8px;
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.btn-reaction-toggle:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.btn-reaction-toggle.muted {
+  opacity: 0.55;
+  border-style: dashed;
+  color: var(--text-muted);
+}
+
 /* Cinema Ambilight Aura Effect */
 .cinema-ambilight-aura {
   position: absolute;
